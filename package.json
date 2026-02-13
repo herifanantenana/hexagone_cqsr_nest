@@ -37,6 +37,7 @@
     "dotenv": "^17.3.1",
     "drizzle-orm": "^0.36.4",
     "jsonwebtoken": "^9.0.2",
+    "multer": "^2.0.2",
     "passport": "^0.7.0",
     "passport-jwt": "^4.0.1",
     "passport-local": "^1.0.0",

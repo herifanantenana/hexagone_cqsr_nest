@@ -1,13 +1,13 @@
 import { ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
-import * as express from 'express';
+import { NestExpressApplication } from '@nestjs/platform-express';
 import { join } from 'path';
 import { AppModule } from './app.module';
 import { GlobalExceptionFilter } from './arch/common/interface/http/filter/global-exception.filter';
 import { LoggingInterceptor } from './arch/common/interface/http/interceptor/logging.interceptor';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create<NestExpressApplication>(AppModule);
 
   // Global validation pipe
   app.useGlobalPipes(
@@ -25,7 +25,7 @@ async function bootstrap() {
   app.useGlobalInterceptors(new LoggingInterceptor());
 
   // Serve static files (for uploaded avatars)
-  app.use('/uploads', express.static(join(process.cwd(), 'uploads')));
+  app.useStaticAssets(join(process.cwd(), 'uploads'), { prefix: '/uploads' });
 
   // Enable CORS
   app.enableCors();

@@ -10,6 +10,6 @@ export default defineConfig({
   dbCredentials: {
     url:
       process.env.DATABASE_URL ||
-      'postgresql://postgres:postgres@localhost:5432/hexagone_cqrs',
+      'postgresql://arakotom:herifanantenana@localhost:5432/test_arch',
   },
 });

@@ -3,6 +3,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { Pool } from 'pg';
 
+// Script standalone pour appliquer les migrations SQL dans l'ordre
 dotenv.config();
 
 async function runMigrations() {
@@ -13,9 +14,11 @@ async function runMigrations() {
   try {
     console.log('Running migrations...');
 
+    // Ordre séquentiel important : les tables avant les vues
     const migrations = ['0000_initial.sql', '0001_views.sql'];
 
     for (const migration of migrations) {
+      // Lit le fichier SQL et l'exécute directement sur le pool
       const filePath = path.join(__dirname, migration);
       const sql = fs.readFileSync(filePath, 'utf-8');
 
@@ -33,4 +36,4 @@ async function runMigrations() {
   }
 }
 
-runMigrations();
+void runMigrations();

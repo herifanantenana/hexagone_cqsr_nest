@@ -9,6 +9,14 @@ import { LoggingInterceptor } from './arch/common/interface/http/interceptor/log
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
 
+  // Trust proxy : indispensable quand l'app tourne derrière un reverse proxy
+  // (Nginx, Cloudflare, AWS ALB…). Sans ça, req.ip retourne l'IP du proxy.
+  // Le "1" signifie "faire confiance au premier proxy dans la chaîne".
+  // Voir aussi : RateLimitGuard.resolveIp() qui utilise x-forwarded-for.
+  if (process.env.TRUST_PROXY === 'true') {
+    app.set('trust proxy', 1);
+  }
+
   // Global validation pipe
   app.useGlobalPipes(
     new ValidationPipe({
@@ -34,4 +42,4 @@ async function bootstrap() {
   await app.listen(port);
   console.log(`Application is running on: http://localhost:${port}`);
 }
-bootstrap();
+void bootstrap();

@@ -1,3 +1,4 @@
+// Query CQRS : recupere le principal (identite minimale) d'un utilisateur par son id
 import { IQueryHandler, QueryHandler } from '@nestjs/cqrs';
 import { UserPrincipal } from '@shared/types/user-principal.type';
 import { UserAuthReadPort } from '../ports/user-auth-read.port';
@@ -20,6 +21,7 @@ export class GetUserPrincipalQueryHandler implements IQueryHandler<
       return null;
     }
 
+    // Retourne uniquement les infos necessaires pour l'identite
     return {
       userId: user.id,
       email: user.email,

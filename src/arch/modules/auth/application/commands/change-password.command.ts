@@ -1,3 +1,4 @@
+// Commande CQRS : changement de mot de passe d'un utilisateur connecte
 import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
 import { UserWriteRepositoryPort } from '../../../user/application/ports/user-write-repository.port';
 import { UserNotFoundError } from '../../../user/domain/errors/user-errors';
@@ -30,6 +31,7 @@ export class ChangePasswordCommandHandler implements ICommandHandler<
   async execute(command: ChangePasswordCommand): Promise<void> {
     const { userId, currentPassword, newPassword } = command;
 
+    // Valide le nouveau mot de passe selon les regles metier
     this.authDomainService.validatePassword(newPassword);
 
     const user = await this.userWriteRepository.findById(userId);
@@ -37,6 +39,7 @@ export class ChangePasswordCommandHandler implements ICommandHandler<
       throw new UserNotFoundError(userId);
     }
 
+    // Verifie que le mot de passe actuel est correct
     const isCurrentPasswordValid = await this.passwordHasher.compare(
       currentPassword,
       user.getPasswordHash(),
@@ -46,12 +49,13 @@ export class ChangePasswordCommandHandler implements ICommandHandler<
       throw new InvalidCredentialsError();
     }
 
+    // Met a jour le hash du nouveau mot de passe
     const newPasswordHash = await this.passwordHasher.hash(newPassword);
     user.updatePassword(newPasswordHash);
 
     await this.userWriteRepository.update(user);
 
-    // Revoke all sessions after password change
+    // Revoque toutes les sessions apres changement de mot de passe
     await this.sessionRepository.revokeAllUserSessions(userId);
   }
 }

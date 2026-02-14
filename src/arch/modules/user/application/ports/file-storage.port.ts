@@ -1,3 +1,7 @@
+// Port abstrait pour le stockage de fichiers (avatar, etc.)
+// L'implementation concrete peut etre locale, S3, etc.
+
+// Resultat d'un upload : cle de stockage + URL publique
 export interface UploadResult {
   key: string;
   url: string;

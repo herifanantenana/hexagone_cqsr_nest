@@ -1,3 +1,4 @@
+// Commande CQRS : inscription d'un nouvel utilisateur
 import { CommandHandler, EventBus, ICommandHandler } from '@nestjs/cqrs';
 import { IdGenerator } from '@shared/utils/id-generator.util';
 import { UserWriteRepositoryPort } from '../../../user/application/ports/user-write-repository.port';
@@ -26,6 +27,7 @@ export class SignupCommandHandler implements ICommandHandler<
   SignupCommand,
   SignupResult
 > {
+  // Service domaine instancie directement (pas de DI, logique pure)
   private readonly authDomainService = new AuthDomainService();
 
   constructor(
@@ -38,14 +40,17 @@ export class SignupCommandHandler implements ICommandHandler<
   async execute(command: SignupCommand): Promise<SignupResult> {
     const { email, password, displayName } = command;
 
+    // Validation metier du mot de passe et du nom
     this.authDomainService.validatePassword(password);
     this.authDomainService.validateDisplayName(displayName);
 
+    // Verifie que l'email n'est pas deja pris
     const existingUser = await this.userAuthReadPort.findByEmail(email);
     if (existingUser) {
       throw new EmailAlreadyUsedError(email);
     }
 
+    // Hache le mot de passe et genere un id unique
     const passwordHash = await this.passwordHasher.hash(password);
     const userId = IdGenerator.generate();
 
@@ -57,6 +62,7 @@ export class SignupCommandHandler implements ICommandHandler<
       status: 'active',
     });
 
+    // Publie l'evenement pour notifier les autres modules
     this.eventBus.publish(new UserSignedUpEvent(userId, email, displayName));
 
     return { userId, email, displayName };

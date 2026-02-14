@@ -1,3 +1,6 @@
+// Adapter de lecture pour l'authentification
+// Fournit les donnees user necessaires au module auth (email, hash, statut)
+
 import { DrizzleService } from '@common/db/drizzle.service';
 import { users } from '@common/db/schema';
 import { Injectable } from '@nestjs/common';
@@ -11,6 +14,7 @@ import {
 export class UserAuthReadAdapter implements UserAuthReadPort {
   constructor(private readonly drizzle: DrizzleService) {}
 
+  // Recherche par email pour le login
   async findByEmail(email: string): Promise<UserAuthSnapshot | null> {
     const results = await this.drizzle.db
       .select({
@@ -30,6 +34,7 @@ export class UserAuthReadAdapter implements UserAuthReadPort {
     return results[0];
   }
 
+  // Recherche par ID pour la validation de session/token
   async findById(id: string): Promise<UserAuthSnapshot | null> {
     const results = await this.drizzle.db
       .select({

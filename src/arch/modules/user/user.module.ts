@@ -1,3 +1,6 @@
+// Module NestJS du domaine User
+// Assemble les handlers CQRS, les adapters et les ports (injection de dependances)
+
 import { DrizzleModule } from '@common/db/drizzle.module';
 import { Module } from '@nestjs/common';
 import { CqrsModule } from '@nestjs/cqrs';
@@ -15,13 +18,13 @@ import { FindUserByEmailQueryHandler } from './application/queries/find-user-by-
 import { GetMyProfileQueryHandler } from './application/queries/get-my-profile.query';
 import { GetPublicProfileQueryHandler } from './application/queries/get-public-profile.query';
 
-// Adapters
+// Adapters (implementations concretes des ports)
 import { LocalFileStorageAdapter } from './infrastructure/adapters/local-file-storage.adapter';
 import { UserAuthReadAdapter } from './infrastructure/adapters/user-auth-read.adapter';
 import { UserRepositoryAdapter } from './infrastructure/adapters/user-repository.adapter';
 import { UserWriteRepositoryAdapter } from './infrastructure/adapters/user-write-repository.adapter';
 
-// Ports
+// Ports (contrats abstraits injectes dans les handlers)
 import { UserAuthReadPort } from '../auth/application/ports/user-auth-read.port';
 import { FileStoragePort } from './application/ports/file-storage.port';
 import { UserRepositoryPort } from './application/ports/user-repository.port';
@@ -39,6 +42,7 @@ const queryHandlers = [
   FindUserByEmailQueryHandler,
 ];
 
+// Binding port -> adapter (inversion de dependance)
 const adapters = [
   {
     provide: UserRepositoryPort,
@@ -62,6 +66,7 @@ const adapters = [
   imports: [CqrsModule, DrizzleModule],
   controllers: [UserController],
   providers: [...commandHandlers, ...queryHandlers, ...adapters],
-  exports: [UserAuthReadPort, UserWriteRepositoryPort], // Export for Auth module
+  // Exporte les ports utilises par le module Auth
+  exports: [UserAuthReadPort, UserWriteRepositoryPort],
 })
 export class UserModule {}

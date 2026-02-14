@@ -1,6 +1,9 @@
+// Commande CQRS : connexion d'un utilisateur (genere access + refresh tokens)
 import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
-import { IdGenerator } from '@shared/utils/id-generator.util';
-import { InvalidCredentialsError, UserDisabledError } from '../../domain/errors';
+import {
+  InvalidCredentialsError,
+  UserDisabledError,
+} from '../../domain/errors';
 import { PasswordHasherPort } from '../ports/password-hasher.port';
 import { SessionRepositoryPort } from '../ports/session-repository.port';
 import { TokenPort } from '../ports/token.port';
@@ -10,7 +13,7 @@ export class LoginCommand {
   constructor(
     public readonly email: string,
     public readonly password: string,
-    public readonly userAgent?: string,
+    public readonly userAgent?: string, // Info navigateur pour tracer la session
     public readonly ip?: string,
   ) {}
 }
@@ -36,11 +39,13 @@ export class LoginCommandHandler implements ICommandHandler<
   async execute(command: LoginCommand): Promise<LoginResult> {
     const { email, password, userAgent, ip } = command;
 
+    // Recherche l'utilisateur par email
     const user = await this.userAuthReadPort.findByEmail(email);
     if (!user) {
       throw new InvalidCredentialsError();
     }
 
+    // Verifie le mot de passe
     const isPasswordValid = await this.passwordHasher.compare(
       password,
       user.passwordHash,
@@ -53,15 +58,16 @@ export class LoginCommandHandler implements ICommandHandler<
       throw new UserDisabledError();
     }
 
-    // Generate refresh token (UUID) and hash it
+    // Genere le refresh token et le stocke hashe en base
     const refreshToken = this.tokenPort.generateRefreshToken({
       userId: user.id,
       email: user.email,
     });
     const refreshTokenHash = await this.passwordHasher.hash(refreshToken);
 
+    // Session valide 7 jours
     const expiresAt = new Date();
-    expiresAt.setDate(expiresAt.getDate() + 7); // 7 days
+    expiresAt.setDate(expiresAt.getDate() + 7);
 
     await this.sessionRepository.create({
       userId: user.id,
@@ -71,12 +77,13 @@ export class LoginCommandHandler implements ICommandHandler<
       ip,
     });
 
+    // Genere l'access token JWT (courte duree)
     const accessToken = this.tokenPort.generateAccessToken({
       userId: user.id,
       email: user.email,
     });
 
-    const expiresIn = 15 * 60; // 15 minutes in seconds
+    const expiresIn = 15 * 60; // 15 minutes en secondes
 
     return {
       accessToken,

@@ -1,3 +1,5 @@
+// Command CQRS : met a jour le profil utilisateur (nom d'affichage et bio)
+
 import { CommandHandler, EventBus, ICommandHandler } from '@nestjs/cqrs';
 import { UserNotFoundError } from '../../domain/errors/user-errors';
 import { UserDomainService } from '../../domain/services/user-domain.service';
@@ -23,6 +25,7 @@ export class UpdateProfileCommandHandler implements ICommandHandler<
   UpdateProfileCommand,
   UpdateProfileResult
 > {
+  // Service domaine instancie directement (pas de dependance infra)
   private readonly userDomainService = new UserDomainService();
 
   constructor(
@@ -33,6 +36,7 @@ export class UpdateProfileCommandHandler implements ICommandHandler<
   async execute(command: UpdateProfileCommand): Promise<UpdateProfileResult> {
     const { userId, displayName, bio } = command;
 
+    // Validation metier avant toute mutation
     this.userDomainService.validateDisplayName(displayName);
     if (bio) {
       this.userDomainService.validateBio(bio);
@@ -43,9 +47,11 @@ export class UpdateProfileCommandHandler implements ICommandHandler<
       throw new UserNotFoundError(userId);
     }
 
+    // Mutation de l'agregat puis persistance
     user.updateProfile(displayName, bio);
     await this.userWriteRepository.update(user);
 
+    // Publication d'un evenement applicatif apres succes
     this.eventBus.publish(
       new UserProfileUpdatedEvent(userId, displayName, bio),
     );

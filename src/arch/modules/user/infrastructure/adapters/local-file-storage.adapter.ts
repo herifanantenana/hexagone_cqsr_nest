@@ -1,3 +1,6 @@
+// Adapter de stockage fichiers en local (systeme de fichiers)
+// Stocke les fichiers dans le dossier "uploads/" a la racine du projet
+
 import { Injectable } from '@nestjs/common';
 import { IdGenerator } from '@shared/utils/id-generator.util';
 import * as fs from 'fs/promises';
@@ -15,17 +18,19 @@ export class LocalFileStorageAdapter implements FileStoragePort {
     file: Express.Multer.File,
     prefix: string,
   ): Promise<UploadResult> {
+    // Genere un nom de fichier unique avec l'extension d'origine
     const fileExtension = path.extname(file.originalname);
     const fileName = `${IdGenerator.generate()}${fileExtension}`;
     const key = `${prefix}/${fileName}`;
     const filePath = path.join(this.uploadsDir, key);
 
-    // Ensure directory exists
+    // Cree le dossier si necessaire
     await fs.mkdir(path.dirname(filePath), { recursive: true });
 
-    // Write file
+    // Ecrit le buffer en memoire sur le disque
     await fs.writeFile(filePath, file.buffer);
 
+    // Retourne une URL relative pour servir le fichier en statique
     const url = `/uploads/${key}`;
     return { key, url };
   }
@@ -36,7 +41,7 @@ export class LocalFileStorageAdapter implements FileStoragePort {
     try {
       await fs.unlink(filePath);
     } catch (error) {
-      // Ignore if file doesn't exist
+      // Ignore l'erreur si le fichier n'existe pas
       if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
         throw error;
       }

@@ -2,9 +2,11 @@ import * as bcrypt from 'bcryptjs';
 import * as dotenv from 'dotenv';
 import { Pool } from 'pg';
 
+// Script standalone exécuté via ts-node pour peupler la DB en dev
 dotenv.config();
 
 async function seed() {
+  // Connexion directe (pas via NestJS) — script indépendant
   const pool = new Pool({
     connectionString: process.env.DATABASE_URL,
   });
@@ -12,8 +14,10 @@ async function seed() {
   try {
     console.log('Starting seed...');
 
+    // Hash partagé entre tous les users de test (salt rounds = 10)
     const passwordHash = await bcrypt.hash('Password123!', 10);
 
+    // ON CONFLICT DO NOTHING → idempotent, peut être relancé sans erreur
     await pool.query(
       `
       INSERT INTO users (email, password_hash, display_name, bio, status)
@@ -36,4 +40,4 @@ async function seed() {
   }
 }
 
-seed();
+void seed();

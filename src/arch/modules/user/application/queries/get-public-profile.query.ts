@@ -1,3 +1,5 @@
+// Query CQRS : recupere le profil public d'un utilisateur (sans donnees sensibles)
+
 import { IQueryHandler, QueryHandler } from '@nestjs/cqrs';
 import { UserNotFoundError } from '../../domain/errors/user-errors';
 import {
@@ -19,6 +21,7 @@ export class GetPublicProfileQueryHandler implements IQueryHandler<
   async execute(
     query: GetPublicProfileQuery,
   ): Promise<PublicUserProfileSnapshot> {
+    // Retourne uniquement les infos publiques (pas d'email ni de statut)
     const profile = await this.userRepository.findPublicProfile(query.userId);
 
     if (!profile) {

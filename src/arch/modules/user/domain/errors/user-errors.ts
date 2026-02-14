@@ -1,3 +1,6 @@
+// Erreurs metier du domaine User
+// Chaque erreur a un nom unique pour faciliter le mapping HTTP dans le controller
+
 export class UserNotFoundError extends Error {
   constructor(identifier: string) {
     super(`User not found: ${identifier}`);

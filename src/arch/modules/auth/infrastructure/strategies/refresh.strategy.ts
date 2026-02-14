@@ -1,3 +1,4 @@
+// Strategie Passport pour le refresh token (extrait depuis le body ou query)
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PassportStrategy } from '@nestjs/passport';
@@ -8,12 +9,18 @@ import { ExtractJwt, Strategy } from 'passport-jwt';
 export class RefreshStrategy extends PassportStrategy(Strategy, 'refresh') {
   constructor(private readonly configService: ConfigService) {
     super({
+      // Extracteur custom : cherche le refreshToken dans le body ou les query params
       jwtFromRequest: ExtractJwt.fromExtractors([
         (request: Request) => {
-          return request.body?.refreshToken || request.query?.refreshToken;
+          return (
+            (request.body as Record<string, string> | undefined)
+              ?.refreshToken ||
+            (request.query as Record<string, string>)?.refreshToken ||
+            null
+          );
         },
       ]),
-      ignoreExpiration: true, // We validate manually in the command handler
+      ignoreExpiration: true, // Expiration geree manuellement dans le command handler
       secretOrKey:
         configService.get<string>('JWT_SECRET') ||
         'your-secret-key-change-in-production',
@@ -21,9 +28,8 @@ export class RefreshStrategy extends PassportStrategy(Strategy, 'refresh') {
     });
   }
 
-  async validate(payload: unknown): Promise<unknown> {
-    // The actual validation happens in RefreshTokenCommand handler
-    // This strategy is not actually used, but kept for potential future use
-    return payload;
+  // La vraie validation se fait dans RefreshTokenCommandHandler
+  validate(payload: unknown): Promise<unknown> {
+    return Promise.resolve(payload);
   }
 }

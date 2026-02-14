@@ -1,9 +1,12 @@
+// Service domaine : contient les regles de validation metier du User
+
 import {
   InvalidBioError,
   InvalidDisplayNameError,
 } from '../errors/user-errors';
 
 export class UserDomainService {
+  // Valide le nom d'affichage (obligatoire, entre 2 et 100 caracteres)
   validateDisplayName(displayName: string): void {
     if (!displayName || displayName.trim().length === 0) {
       throw new InvalidDisplayNameError('Display name is required');
@@ -22,12 +25,14 @@ export class UserDomainService {
     }
   }
 
+  // Valide la bio (optionnelle, max 500 caracteres)
   validateBio(bio: string): void {
     if (bio && bio.length > 500) {
       throw new InvalidBioError('Bio cannot exceed 500 characters');
     }
   }
 
+  // Valide le type et la taille du fichier avatar
   validateAvatarFile(mimetype: string, size: number): void {
     const allowedTypes = ['image/jpeg', 'image/png', 'image/webp'];
     if (!allowedTypes.includes(mimetype)) {

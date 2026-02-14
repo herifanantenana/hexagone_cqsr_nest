@@ -1,3 +1,7 @@
+// Port de lecture (read) pour les profils utilisateur
+// Utilise des snapshots (projections plates) au lieu du modele domaine
+
+// Snapshot complet du profil (pour l'utilisateur connecte)
 export interface UserProfileSnapshot {
   id: string;
   email: string;
@@ -9,6 +13,7 @@ export interface UserProfileSnapshot {
   updatedAt: Date;
 }
 
+// Snapshot public (sans email ni statut)
 export interface PublicUserProfileSnapshot {
   id: string;
   displayName: string;
@@ -17,6 +22,7 @@ export interface PublicUserProfileSnapshot {
   createdAt: Date;
 }
 
+// Classe abstraite servant de contrat d'injection pour NestJS
 export abstract class UserRepositoryPort {
   abstract findMyProfile(userId: string): Promise<UserProfileSnapshot | null>;
   abstract findPublicProfile(

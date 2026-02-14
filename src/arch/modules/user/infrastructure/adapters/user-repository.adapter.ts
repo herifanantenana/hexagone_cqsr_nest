@@ -1,3 +1,6 @@
+// Adapter de lecture : implemente le port UserRepositoryPort avec Drizzle ORM
+// Lit depuis des vues SQL dediees (separation read/write)
+
 import { DrizzleService } from '@common/db/drizzle.service';
 import { userMeView, userPublicView } from '@common/db/schema';
 import { Injectable } from '@nestjs/common';
@@ -12,6 +15,7 @@ import {
 export class UserRepositoryAdapter implements UserRepositoryPort {
   constructor(private readonly drizzle: DrizzleService) {}
 
+  // Lecture depuis la vue "userMeView" (profil complet)
   async findMyProfile(userId: string): Promise<UserProfileSnapshot | null> {
     const results = await this.drizzle.db
       .select()
@@ -23,6 +27,7 @@ export class UserRepositoryAdapter implements UserRepositoryPort {
       return null;
     }
 
+    // Mapping de la ligne SQL vers le snapshot
     const row = results[0];
     return {
       id: row.id,
@@ -36,6 +41,7 @@ export class UserRepositoryAdapter implements UserRepositoryPort {
     };
   }
 
+  // Lecture depuis la vue "userPublicView" (infos publiques uniquement)
   async findPublicProfile(
     userId: string,
   ): Promise<PublicUserProfileSnapshot | null> {

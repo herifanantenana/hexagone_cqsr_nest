@@ -1,3 +1,5 @@
+// DTO de reponse pour le profil complet (utilisateur connecte uniquement)
+
 export class ProfileResponseDto {
   id: string;
   email: string;

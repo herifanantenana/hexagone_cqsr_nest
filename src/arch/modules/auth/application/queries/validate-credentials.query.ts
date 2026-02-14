@@ -1,3 +1,4 @@
+// Query CQRS : valide les identifiants (email + mot de passe) d'un utilisateur
 import { IQueryHandler, QueryHandler } from '@nestjs/cqrs';
 import {
   InvalidCredentialsError,
@@ -33,11 +34,13 @@ export class ValidateCredentialsQueryHandler implements IQueryHandler<
   ): Promise<ValidateCredentialsResult> {
     const { email, password } = query;
 
+    // Recherche l'utilisateur par email
     const user = await this.userAuthReadPort.findByEmail(email);
     if (!user) {
       throw new InvalidCredentialsError();
     }
 
+    // Verifie le mot de passe avec le hash stocke en base
     const isPasswordValid = await this.passwordHasher.compare(
       password,
       user.passwordHash,
@@ -47,6 +50,7 @@ export class ValidateCredentialsQueryHandler implements IQueryHandler<
       throw new InvalidCredentialsError();
     }
 
+    // Verifie que le compte est actif
     if (user.status !== 'active') {
       throw new UserDisabledError();
     }

@@ -1,12 +1,17 @@
+// Configuration Multer pour l'upload d'avatar
+// Stocke en memoire (buffer) avant traitement par le command handler
+
 import { BadRequestException } from '@nestjs/common';
 import { MulterOptions } from '@nestjs/platform-express/multer/interfaces/multer-options.interface';
 import { memoryStorage } from 'multer';
 
 export const avatarMulterConfig: MulterOptions = {
+  // Stockage en memoire pour acceder au buffer dans le handler
   storage: memoryStorage(),
   limits: {
-    fileSize: 2 * 1024 * 1024, // 2MB
+    fileSize: 2 * 1024 * 1024, // Limite a 2MB
   },
+  // Filtre les types MIME acceptes cote HTTP (avant le domaine)
   fileFilter: (req, file, callback) => {
     const allowedMimetypes = ['image/jpeg', 'image/png', 'image/webp'];
 

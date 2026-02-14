@@ -1,3 +1,4 @@
+// Strategie Passport locale : authentifie via email + mot de passe
 import { Injectable } from '@nestjs/common';
 import { QueryBus } from '@nestjs/cqrs';
 import { PassportStrategy } from '@nestjs/passport';
@@ -9,11 +10,12 @@ import { ValidateCredentialsQuery } from '../../application/queries/validate-cre
 export class LocalStrategy extends PassportStrategy(Strategy, 'local') {
   constructor(private readonly queryBus: QueryBus) {
     super({
-      usernameField: 'email',
+      usernameField: 'email', // Utilise le champ email au lieu de username
       passwordField: 'password',
     });
   }
 
+  // Appele automatiquement par Passport pour valider les identifiants
   async validate(email: string, password: string): Promise<UserPrincipal> {
     return await this.queryBus.execute(
       new ValidateCredentialsQuery(email, password),

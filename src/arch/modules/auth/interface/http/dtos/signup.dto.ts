@@ -1,3 +1,4 @@
+// DTO de validation pour l'inscription (valide avec class-validator)
 import { IsEmail, IsString, MaxLength, MinLength } from 'class-validator';
 
 export class SignupDto {
@@ -5,7 +6,7 @@ export class SignupDto {
   email: string;
 
   @IsString()
-  @MinLength(8)
+  @MinLength(8) // Longueur minimum du mot de passe
   password: string;
 
   @IsString()

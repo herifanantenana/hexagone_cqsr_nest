@@ -1,3 +1,5 @@
+// Query CQRS : recupere le profil complet de l'utilisateur connecte
+
 import { IQueryHandler, QueryHandler } from '@nestjs/cqrs';
 import { UserNotFoundError } from '../../domain/errors/user-errors';
 import {
@@ -14,6 +16,7 @@ export class GetMyProfileQueryHandler implements IQueryHandler<
   GetMyProfileQuery,
   UserProfileSnapshot
 > {
+  // Injecte le port de lecture (pas le write repository)
   constructor(private readonly userRepository: UserRepositoryPort) {}
 
   async execute(query: GetMyProfileQuery): Promise<UserProfileSnapshot> {

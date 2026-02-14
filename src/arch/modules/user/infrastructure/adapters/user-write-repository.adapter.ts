@@ -1,3 +1,6 @@
+// Adapter d'ecriture : implemente le port UserWriteRepositoryPort avec Drizzle ORM
+// Gere le CRUD sur la table "users" et la conversion vers le modele domaine
+
 import { DrizzleService } from '@common/db/drizzle.service';
 import { users } from '@common/db/schema';
 import { Injectable } from '@nestjs/common';
@@ -14,6 +17,7 @@ import { UserStatus } from '../../domain/value-objects/user-status.vo';
 export class UserWriteRepositoryAdapter implements UserWriteRepositoryPort {
   constructor(private readonly drizzle: DrizzleService) {}
 
+  // Insere un nouvel utilisateur en base
   async create(data: CreateUserData): Promise<void> {
     await this.drizzle.db.insert(users).values({
       id: data.id,
@@ -26,6 +30,7 @@ export class UserWriteRepositoryAdapter implements UserWriteRepositoryPort {
     });
   }
 
+  // Persiste les modifications de l'agregat User
   async update(user: User): Promise<void> {
     await this.drizzle.db
       .update(users)
@@ -69,6 +74,7 @@ export class UserWriteRepositoryAdapter implements UserWriteRepositoryPort {
     return this.toDomain(results[0]);
   }
 
+  // Convertit une ligne SQL en agregat domaine User
   private toDomain(row: typeof users.$inferSelect): User {
     return User.reconstitute({
       id: row.id,

@@ -1,6 +1,11 @@
+// Commande CQRS : rafraichissement des tokens (rotation du refresh token)
 import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
 import { IdGenerator } from '@shared/utils/id-generator.util';
-import { InvalidTokenError, SessionNotFoundError, UserDisabledError } from '../../domain/errors';
+import {
+  InvalidTokenError,
+  SessionNotFoundError,
+  UserDisabledError,
+} from '../../domain/errors';
 import { PasswordHasherPort } from '../ports/password-hasher.port';
 import { SessionRepositoryPort } from '../ports/session-repository.port';
 import { TokenPort } from '../ports/token.port';
@@ -17,9 +22,10 @@ export interface RefreshTokenResult {
 }
 
 @CommandHandler(RefreshTokenCommand)
-export class RefreshTokenCommandHandler
-  implements ICommandHandler<RefreshTokenCommand, RefreshTokenResult>
-{
+export class RefreshTokenCommandHandler implements ICommandHandler<
+  RefreshTokenCommand,
+  RefreshTokenResult
+> {
   constructor(
     private readonly sessionRepository: SessionRepositoryPort,
     private readonly passwordHasher: PasswordHasherPort,
@@ -30,25 +36,26 @@ export class RefreshTokenCommandHandler
   async execute(command: RefreshTokenCommand): Promise<RefreshTokenResult> {
     const { refreshToken } = command;
 
-    // Hash the refresh token to find matching session
+    // Hache le refresh token pour chercher la session correspondante
     const refreshTokenHash = await this.passwordHasher.hash(refreshToken);
-    const session = await this.sessionRepository.findByRefreshTokenHash(refreshTokenHash);
+    const session =
+      await this.sessionRepository.findByRefreshTokenHash(refreshTokenHash);
 
     if (!session) {
       throw new SessionNotFoundError();
     }
 
-    // Check if session is revoked
+    // Verifie que la session n'est pas revoquee
     if (session.revokedAt !== null) {
       throw new InvalidTokenError('Session has been revoked');
     }
 
-    // Check if session is expired
+    // Verifie que la session n'est pas expiree
     if (session.expiresAt < new Date()) {
       throw new InvalidTokenError('Session has expired');
     }
 
-    // Get user info
+    // Recupere les infos utilisateur pour generer les nouveaux tokens
     const user = await this.userAuthReadPort.findById(session.userId);
 
     if (!user) {
@@ -59,13 +66,14 @@ export class RefreshTokenCommandHandler
       throw new UserDisabledError();
     }
 
-    // Revoke old session
+    // Revoque l'ancienne session (rotation de token)
     await this.sessionRepository.revokeSession(session.id);
 
-    // Generate new tokens and create new session
+    // Genere un nouveau refresh token et cree une nouvelle session
     const newRefreshToken = IdGenerator.generate();
     const newRefreshTokenHash = await this.passwordHasher.hash(newRefreshToken);
 
+    // Nouvelle session valide 7 jours
     const expiresAt = new Date();
     expiresAt.setDate(expiresAt.getDate() + 7);
 
@@ -80,7 +88,7 @@ export class RefreshTokenCommandHandler
       email: user.email,
     });
 
-    const expiresIn = 15 * 60; // 15 minutes
+    const expiresIn = 15 * 60; // 15 minutes en secondes
 
     return {
       accessToken,

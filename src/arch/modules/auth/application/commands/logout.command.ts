@@ -1,10 +1,11 @@
+// Commande CQRS : deconnexion (revoque une ou toutes les sessions)
 import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
 import { SessionRepositoryPort } from '../ports/session-repository.port';
 
 export class LogoutCommand {
   constructor(
     public readonly userId: string,
-    public readonly sessionId?: string,
+    public readonly sessionId?: string, // Si fourni, revoque uniquement cette session
   ) {}
 }
 
@@ -19,13 +20,13 @@ export class LogoutCommandHandler implements ICommandHandler<
     const { userId, sessionId } = command;
 
     if (sessionId) {
-      // Revoke specific session
+      // Revoque une session specifique apres verification du proprietaire
       const session = await this.sessionRepository.findById(sessionId);
       if (session && session.userId === userId) {
         await this.sessionRepository.revokeSession(sessionId);
       }
     } else {
-      // Revoke all user sessions
+      // Revoque toutes les sessions de l'utilisateur
       await this.sessionRepository.revokeAllUserSessions(userId);
     }
   }

@@ -1,5 +1,6 @@
 import { v4 as uuidv4 } from 'uuid';
 
+// Utilitaire partagé pour générer et valider des UUID v4
 export class IdGenerator {
   static generate(): string {
     return uuidv4();

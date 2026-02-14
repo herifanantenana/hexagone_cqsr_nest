@@ -1,3 +1,6 @@
+// Evenements domaine emis lors de changements sur l'agregat User
+
+// Emis quand le profil (nom, bio) est mis a jour
 export class UserProfileUpdatedDomainEvent {
   constructor(
     public readonly userId: string,
@@ -6,6 +9,7 @@ export class UserProfileUpdatedDomainEvent {
   ) {}
 }
 
+// Emis quand un avatar est uploade
 export class UserAvatarUploadedDomainEvent {
   constructor(
     public readonly userId: string,
@@ -14,6 +18,7 @@ export class UserAvatarUploadedDomainEvent {
   ) {}
 }
 
+// Emis quand un avatar est supprime
 export class UserAvatarDeletedDomainEvent {
   constructor(
     public readonly userId: string,

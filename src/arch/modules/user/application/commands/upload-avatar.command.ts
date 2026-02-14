@@ -1,3 +1,5 @@
+// Command CQRS : upload d'un avatar utilisateur (supprime l'ancien si existant)
+
 import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
 import { UserNotFoundError } from '../../domain/errors/user-errors';
 import { UserDomainService } from '../../domain/services/user-domain.service';
@@ -30,6 +32,7 @@ export class UploadAvatarCommandHandler implements ICommandHandler<
   async execute(command: UploadAvatarCommand): Promise<UploadAvatarResult> {
     const { userId, file } = command;
 
+    // Validation metier du fichier (type MIME + taille)
     this.userDomainService.validateAvatarFile(file.mimetype, file.size);
 
     const user = await this.userWriteRepository.findById(userId);
@@ -37,13 +40,13 @@ export class UploadAvatarCommandHandler implements ICommandHandler<
       throw new UserNotFoundError(userId);
     }
 
-    // Delete old avatar if exists
+    // Supprime l'ancien avatar s'il existe
     const oldAvatarKey = user.getAvatarKey();
     if (oldAvatarKey) {
       await this.fileStorage.delete(oldAvatarKey);
     }
 
-    // Upload new avatar
+    // Upload du nouvel avatar via le port de stockage
     const { key, url } = await this.fileStorage.upload(
       file,
       `avatars/${userId}`,

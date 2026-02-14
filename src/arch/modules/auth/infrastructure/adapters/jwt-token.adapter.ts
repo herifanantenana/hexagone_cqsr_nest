@@ -1,3 +1,4 @@
+// Adapter infra : implementation du port Token avec jsonwebtoken
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { IdGenerator } from '@shared/utils/id-generator.util';
@@ -10,6 +11,7 @@ export class JwtTokenAdapter implements TokenPort {
   private readonly jwtExpiresIn: string | number;
 
   constructor(private readonly configService: ConfigService) {
+    // Charge la config JWT depuis les variables d'environnement
     this.jwtSecret =
       this.configService.get<string>('JWT_ACCESS_SECRET') ||
       'your-secret-key-change-in-production';
@@ -17,6 +19,7 @@ export class JwtTokenAdapter implements TokenPort {
       this.configService.get<string>('JWT_ACCESS_EXPIRATION') || '15m';
   }
 
+  // Signe un JWT avec le payload utilisateur et une duree courte
   generateAccessToken(payload: { userId: string; email: string }): string {
     return jwt.sign(
       {
@@ -31,8 +34,8 @@ export class JwtTokenAdapter implements TokenPort {
     );
   }
 
-  generateRefreshToken(payload: { userId: string; email: string }): string {
-    // Generate a random UUID for refresh token (stored hashed in DB)
+  // Le refresh token est un UUID aleatoire (pas un JWT), stocke hashe en base
+  generateRefreshToken(_payload: { userId: string; email: string }): string {
     return IdGenerator.generate();
   }
 
@@ -40,14 +43,15 @@ export class JwtTokenAdapter implements TokenPort {
     try {
       const decoded = jwt.verify(token, this.jwtSecret) as TokenPayload;
       return decoded;
-    } catch (error) {
+    } catch (_error) {
       throw new Error('Invalid access token');
     }
   }
 
-  verifyRefreshToken(token: string): TokenPayload {
-    // Refresh tokens are UUIDs, not JWTs. Validation happens in the command handler.
-    // This method shouldn't be used in the current implementation.
-    throw new Error('Refresh token verification should be done via session lookup');
+  // Non utilise : les refresh tokens sont des UUID, pas des JWT
+  verifyRefreshToken(_token: string): TokenPayload {
+    throw new Error(
+      'Refresh token verification should be done via session lookup',
+    );
   }
 }

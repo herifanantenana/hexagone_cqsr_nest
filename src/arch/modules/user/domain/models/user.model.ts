@@ -1,6 +1,9 @@
+// Agregat User : entite racine du domaine utilisateur
+
 import { Email } from '../value-objects/email.vo';
 import { UserStatus } from '../value-objects/user-status.vo';
 
+// Proprietes internes de l'agregat User
 export interface UserProps {
   id: string;
   email: Email;
@@ -17,13 +20,17 @@ export interface UserProps {
 export class User {
   private constructor(private props: UserProps) {}
 
+  // Cree un nouvel utilisateur
   static create(props: UserProps): User {
     return new User(props);
   }
 
+  // Reconstruit un user depuis la base de donnees
   static reconstitute(props: UserProps): User {
     return new User(props);
   }
+
+  // --- Accesseurs en lecture seule ---
 
   getId(): string {
     return this.props.id;
@@ -65,6 +72,9 @@ export class User {
     return this.props.updatedAt;
   }
 
+  // --- Methodes de mutation du domaine ---
+
+  // Met a jour le nom d'affichage et la bio
   updateProfile(displayName: string, bio?: string): void {
     if (displayName && displayName.trim().length > 0) {
       this.props.displayName = displayName.trim();
@@ -78,6 +88,7 @@ export class User {
     this.props.updatedAt = new Date();
   }
 
+  // Associe un avatar (cle de stockage + URL publique)
   setAvatar(avatarKey: string, avatarUrl: string): void {
     this.props.avatarKey = avatarKey;
     this.props.avatarUrl = avatarUrl;
@@ -89,6 +100,8 @@ export class User {
     this.props.avatarUrl = undefined;
     this.props.updatedAt = new Date();
   }
+
+  // --- Gestion du statut ---
 
   deactivate(): void {
     this.props.status = UserStatus.inactive();

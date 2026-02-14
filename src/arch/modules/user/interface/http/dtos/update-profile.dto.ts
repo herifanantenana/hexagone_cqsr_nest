@@ -1,3 +1,5 @@
+// DTO de validation pour la mise a jour du profil (valide via class-validator)
+
 import { IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
 
 export class UpdateProfileDto {

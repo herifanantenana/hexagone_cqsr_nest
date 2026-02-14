@@ -1,3 +1,6 @@
+// Evenements du domaine auth, emis lors des actions utilisateur
+
+// Emis apres une inscription reussie
 export class UserRegisteredEvent {
   constructor(
     public readonly userId: string,
@@ -5,6 +8,7 @@ export class UserRegisteredEvent {
   ) {}
 }
 
+// Emis apres une connexion reussie
 export class UserLoggedInEvent {
   constructor(
     public readonly userId: string,
@@ -12,6 +16,7 @@ export class UserLoggedInEvent {
   ) {}
 }
 
+// Emis apres une deconnexion
 export class UserLoggedOutEvent {
   constructor(
     public readonly userId: string,
@@ -19,6 +24,7 @@ export class UserLoggedOutEvent {
   ) {}
 }
 
+// Emis apres un changement de mot de passe
 export class PasswordChangedEvent {
   constructor(public readonly userId: string) {}
 }

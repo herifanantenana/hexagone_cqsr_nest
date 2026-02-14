@@ -21,11 +21,17 @@ export class GetUserPrincipalQueryHandler implements IQueryHandler<
       return null;
     }
 
-    // Retourne uniquement les infos necessaires pour l'identite
+    // Retourne l'identité + permissions par défaut
+    // Pas de rôles : tous les users actifs reçoivent les mêmes droits de base
+    // Si un système de rôles est ajouté plus tard, charger les permissions depuis la DB ici
     return {
       userId: user.id,
       email: user.email,
       status: user.status,
+      permissions: [
+        { resource: 'posts', actions: ['create', 'read', 'update', 'delete'] },
+        { resource: 'user', actions: ['read', 'update'] },
+      ],
     };
   }
 }

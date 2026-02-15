@@ -20,6 +20,7 @@ export interface CreatePostResult {
   content: string;
   visibility: string;
   createdAt: Date;
+  updatedAt: Date;
 }
 
 @CommandHandler(CreatePostCommand)
@@ -56,6 +57,7 @@ export class CreatePostCommandHandler implements ICommandHandler<
       content: content.trim(),
       visibility,
       createdAt: now,
+      updatedAt: now,
     };
   }
 }

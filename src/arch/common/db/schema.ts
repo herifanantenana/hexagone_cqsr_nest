@@ -6,6 +6,7 @@ import { eq } from 'drizzle-orm';
 import {
   pgTable,
   pgView,
+  primaryKey,
   text,
   timestamp,
   uuid,
@@ -117,3 +118,55 @@ export const postsPublicView = pgView('posts_public_view').as((qb) =>
     .innerJoin(users, eq(posts.ownerId, users.id))
     .where(eq(posts.visibility, 'public')),
 );
+
+// ─── Table Conversations ────────────────────────────────────────────────────
+// Une conversation regroupe des membres qui echangent des messages
+export const conversations = pgTable('conversations', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  createdBy: uuid('created_by')
+    .notNull()
+    .references(() => users.id, { onDelete: 'cascade' }), // Createur de la conversation
+  title: varchar('title', { length: 255 }), // Optionnel : nom de la conversation
+  createdAt: timestamp('created_at', { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
+
+// ─── Table Conversation Members ─────────────────────────────────────────────
+// Relation N:N entre conversations et users (PK composite = UNIQUE implicite)
+export const conversationMembers = pgTable(
+  'conversation_members',
+  {
+    conversationId: uuid('conversation_id')
+      .notNull()
+      .references(() => conversations.id, { onDelete: 'cascade' }),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    joinedAt: timestamp('joined_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => ({
+    pk: primaryKey({ columns: [table.conversationId, table.userId] }),
+  }),
+);
+
+// ─── Table Messages ─────────────────────────────────────────────────────────
+// Les messages envoyes dans une conversation
+export const messages = pgTable('messages', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  conversationId: uuid('conversation_id')
+    .notNull()
+    .references(() => conversations.id, { onDelete: 'cascade' }),
+  senderId: uuid('sender_id')
+    .notNull()
+    .references(() => users.id, { onDelete: 'cascade' }),
+  content: text('content').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});

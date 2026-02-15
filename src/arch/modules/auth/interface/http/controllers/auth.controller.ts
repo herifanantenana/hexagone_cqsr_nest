@@ -1,6 +1,6 @@
 // Controller HTTP du module Auth
 // Situé dans Interface car c'est la porte d'entrée HTTP vers les commandes CQRS auth
-import { AuthThrottle } from '@common/interface/http/decorators';
+import { AuthThrottle, Can } from '@common/interface/http/decorators';
 import {
   Body,
   Controller,
@@ -120,11 +120,13 @@ export class AuthController {
 
   @Post('logout')
   @UseGuards(JwtAuthGuard)
+  @Can('user', 'read')
   @HttpCode(HttpStatus.NO_CONTENT)
-  @ApiBearerAuth()
+  @ApiBearerAuth('BearerAuth')
   @ApiOperation({ summary: 'Logout (revoke session)' })
   @ApiResponse({ status: 204, description: 'Logged out' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Missing permission' })
   async logout(@CurrentUser() user: UserPrincipal): Promise<void> {
     await this.commandBus.execute<LogoutCommand, void>(
       new LogoutCommand(user.userId),
@@ -133,8 +135,9 @@ export class AuthController {
 
   @Post('change-password')
   @UseGuards(JwtAuthGuard)
+  @Can('user', 'update')
   @HttpCode(HttpStatus.NO_CONTENT)
-  @ApiBearerAuth()
+  @ApiBearerAuth('BearerAuth')
   @ApiOperation({ summary: 'Change password (revokes all sessions)' })
   @ApiBody({ type: ChangePasswordDto })
   @ApiResponse({ status: 204, description: 'Password changed' })

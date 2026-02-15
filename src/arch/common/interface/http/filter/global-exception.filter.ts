@@ -48,6 +48,19 @@ export class GlobalExceptionFilter implements ExceptionFilter {
       const errorName = exception.constructor.name;
 
       switch (errorName) {
+        // ── JWT token errors (jsonwebtoken library) ──
+        case 'TokenExpiredError':
+          status = HttpStatus.UNAUTHORIZED;
+          message = 'Access token has expired';
+          error = 'TokenExpired';
+          break;
+        case 'JsonWebTokenError':
+        case 'NotBeforeError':
+          status = HttpStatus.UNAUTHORIZED;
+          message = 'Invalid or malformed token';
+          error = 'InvalidToken';
+          break;
+
         // ── Auth domain errors ──
         case 'InvalidCredentialsError':
         case 'InvalidTokenError':
@@ -70,21 +83,43 @@ export class GlobalExceptionFilter implements ExceptionFilter {
           message = exception.message;
           error = 'NotFound';
           break;
-        case 'ForbiddenError':
         case 'UserDisabledError':
         case 'ForbiddenPostAccessError':
+        case 'SessionRevokedError':
           status = HttpStatus.FORBIDDEN;
           message = exception.message;
           error = 'Forbidden';
           break;
         case 'InvalidEmailError':
         case 'InvalidPasswordError':
+        case 'InvalidDisplayNameError':
+        case 'InvalidBioError':
         case 'InvalidFileTypeError':
-        case 'FileTooLargeError':
+        case 'FileSizeLimitExceededError':
         case 'InvalidPostDataError':
+        case 'EmptyMessageError':
+        case 'MessageTooLongError':
           status = HttpStatus.BAD_REQUEST;
           message = exception.message;
           error = 'BadRequest';
+          break;
+
+        // ── Chat domain errors ──
+        case 'ConversationNotFoundError':
+          status = HttpStatus.NOT_FOUND;
+          message = exception.message;
+          error = 'NotFound';
+          break;
+        case 'NotConversationMemberError':
+        case 'CannotAddMemberError':
+          status = HttpStatus.FORBIDDEN;
+          message = exception.message;
+          error = 'Forbidden';
+          break;
+        case 'AlreadyConversationMemberError':
+          status = HttpStatus.CONFLICT;
+          message = exception.message;
+          error = 'Conflict';
           break;
 
         default:

@@ -65,7 +65,7 @@ export class PostsController {
   @UseGuards(JwtAuthGuard)
   @Can('posts', 'create')
   @HttpCode(HttpStatus.CREATED)
-  @ApiBearerAuth()
+  @ApiBearerAuth('BearerAuth')
   @ApiOperation({ summary: 'Create a new post' })
   @ApiBody({ type: CreatePostDto })
   @ApiResponse({
@@ -98,7 +98,7 @@ export class PostsController {
       content: result.content,
       visibility: result.visibility,
       createdAt: result.createdAt,
-      updatedAt: result.createdAt,
+      updatedAt: result.updatedAt ?? result.createdAt,
     };
   }
 
@@ -150,7 +150,7 @@ export class PostsController {
   @Patch(':id')
   @UseGuards(JwtAuthGuard)
   @Can('posts', 'update')
-  @ApiBearerAuth()
+  @ApiBearerAuth('BearerAuth')
   @ApiOperation({ summary: 'Update a post (owner only)' })
   @ApiParam({ name: 'id', description: 'Post UUID', type: String })
   @ApiBody({ type: UpdatePostDto })
@@ -184,7 +184,7 @@ export class PostsController {
   @UseGuards(JwtAuthGuard)
   @Can('posts', 'delete')
   @HttpCode(HttpStatus.NO_CONTENT)
-  @ApiBearerAuth()
+  @ApiBearerAuth('BearerAuth')
   @ApiOperation({ summary: 'Delete a post (owner only)' })
   @ApiParam({ name: 'id', description: 'Post UUID', type: String })
   @ApiResponse({ status: 204, description: 'Post deleted' })

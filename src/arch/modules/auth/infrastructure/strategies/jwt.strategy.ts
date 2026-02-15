@@ -1,39 +1,48 @@
 // Strategie Passport JWT : authentifie via un access token Bearer
-import { Injectable } from '@nestjs/common';
+// Les permissions sont extraites directement du payload JWT (pas de DB call)
+import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { QueryBus } from '@nestjs/cqrs';
 import { PassportStrategy } from '@nestjs/passport';
-import { UserPrincipal } from '@shared/types/user-principal.type';
+import { Permission, UserPrincipal } from '@shared/types/user-principal.type';
 import { ExtractJwt, Strategy } from 'passport-jwt';
-import { GetUserPrincipalQuery } from '../../application/queries/get-user-principal.query';
 
-// Structure du payload decode depuis le JWT
+// Structure du payload decode depuis le JWT (correspond au sign dans JwtTokenAdapter)
 interface JwtPayload {
-  userId: string;
-  email: string;
-  status: string;
   sub: string;
+  email: string;
+  type: 'access';
+  permissions: Permission[];
+  iat: number;
+  exp: number;
 }
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
-  constructor(
-    private readonly configService: ConfigService,
-    private readonly queryBus: QueryBus,
-  ) {
+  constructor(private readonly configService: ConfigService) {
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(), // Extrait le token du header Authorization
-      ignoreExpiration: false, // Rejette les tokens expires
+      ignoreExpiration: false, // Rejette les tokens expires (passport-jwt verifie exp)
       secretOrKey:
-        configService.get<string>('JWT_SECRET') ||
+        configService.get<string>('JWT_ACCESS_SECRET') ||
         'your-secret-key-change-in-production',
+      // Tolerance d'horloge configurable (compense un leger decalage client/serveur)
+      clockTolerance: configService.get<number>('CLOCK_SKEW_SECONDS') || 5,
     });
   }
 
-  // Recupere l'utilisateur complet a partir du payload JWT
-  async validate(payload: JwtPayload): Promise<UserPrincipal> {
-    return await this.queryBus.execute(
-      new GetUserPrincipalQuery(payload.userId),
-    );
+  // Construit le UserPrincipal a partir du payload JWT
+  // Les permissions sont embarquees dans le token au moment du login/refresh
+  // → aucun appel DB ici (stateless, performant)
+  validate(payload: JwtPayload): UserPrincipal {
+    if (payload.type !== 'access') {
+      throw new UnauthorizedException('Invalid token type');
+    }
+
+    return {
+      userId: payload.sub,
+      email: payload.email,
+      status: 'active', // Si le token est valide, l'utilisateur etait actif au moment de l'emission
+      permissions: payload.permissions || [],
+    };
   }
 }

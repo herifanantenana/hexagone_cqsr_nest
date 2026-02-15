@@ -47,8 +47,9 @@ async function bootstrap() {
   const swaggerConfig = new DocumentBuilder()
     .setTitle('Hexagonal CQRS API')
     .setDescription(
-      'API REST NestJS avec architecture hexagonale, CQRS, JWT auth, et module posts.\n\n' +
-        '**Format des erreurs :** `{ statusCode, error, message, requestId, timestamp, path }`',
+      'API REST + WebSocket NestJS avec architecture hexagonale, CQRS, JWT auth, posts et chat temps reel.\n\n' +
+        '**Format des erreurs :** `{ statusCode, error, message, requestId, timestamp, path }`\n\n' +
+        '**WebSocket :** connect to `/chat` namespace with `{ auth: { token: "<JWT>" } }`',
     )
     .setVersion('1.0.0')
     .addServer(
@@ -57,12 +58,13 @@ async function bootstrap() {
     )
     .addBearerAuth(
       { type: 'http', scheme: 'bearer', bearerFormat: 'JWT' },
-      'BearerAuth', // Nom du schéma, référencé par @ApiBearerAuth() dans les controllers
+      'BearerAuth',
     )
     .addTag('Health', 'Health check endpoint')
     .addTag('Auth', 'Authentication : signup, login, token refresh, logout')
     .addTag('Users', 'User profile management')
     .addTag('Posts', 'CRUD posts with visibility (public/private)')
+    .addTag('Chat', 'Conversations and messages (HTTP + WebSocket)')
     .build();
 
   const document = SwaggerModule.createDocument(app, swaggerConfig);

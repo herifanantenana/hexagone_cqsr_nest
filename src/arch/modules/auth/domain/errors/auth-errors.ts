@@ -48,10 +48,18 @@ export class InvalidPasswordError extends Error {
   }
 }
 
-// Compte utilisateur desactive
+// Compte utilisateur désactivé
 export class UserDisabledError extends Error {
   constructor() {
     super('User account is disabled');
     this.name = 'UserDisabledError';
+  }
+}
+
+// Nom d'affichage ne respectant pas les contraintes (2-100 chars)
+export class InvalidDisplayNameError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'InvalidDisplayNameError';
   }
 }

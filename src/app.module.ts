@@ -21,6 +21,7 @@ import {
 } from './arch/common/interface/http/guards';
 import { RequestIdMiddleware } from './arch/common/interface/http/middleware/request-id.middleware';
 import { AuthModule } from './arch/modules/auth/auth.module';
+import { ChatModule } from './arch/modules/chat/chat.module';
 import { PostsModule } from './arch/modules/posts/posts.module';
 import { UserModule } from './arch/modules/user/user.module';
 
@@ -30,7 +31,7 @@ import { UserModule } from './arch/modules/user/user.module';
     // Charge .env par défaut (copier .env.example → .env avant de démarrer)
     ConfigModule.forRoot({
       isGlobal: true,
-      envFilePath: '.env.example',
+      envFilePath: '.env',
     }),
 
     // Redis utilisé comme storage partagé pour les compteurs de rate limiting
@@ -65,7 +66,8 @@ import { UserModule } from './arch/modules/user/user.module';
 
     AuthModule, // signup, login, refresh, logout, change-password
     UserModule, // profil, avatar
-    PostsModule, // CRUD posts avec visibilité
+    PostsModule, // CRUD posts avec visibilite
+    ChatModule, // conversations + messages HTTP + WebSocket temps reel
   ],
   controllers: [AppController],
   providers: [

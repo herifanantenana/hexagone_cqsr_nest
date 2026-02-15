@@ -1,12 +1,11 @@
 // Commande CQRS : rafraichissement des tokens (rotation du refresh token)
 import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
-import { IdGenerator } from '@shared/utils/id-generator.util';
+import { DEFAULT_PERMISSIONS } from '@shared/types/user-principal.type';
 import {
   InvalidTokenError,
   SessionNotFoundError,
   UserDisabledError,
 } from '../../domain/errors';
-import { PasswordHasherPort } from '../ports/password-hasher.port';
 import { SessionRepositoryPort } from '../ports/session-repository.port';
 import { TokenPort } from '../ports/token.port';
 import { UserAuthReadPort } from '../ports/user-auth-read.port';
@@ -28,7 +27,6 @@ export class RefreshTokenCommandHandler implements ICommandHandler<
 > {
   constructor(
     private readonly sessionRepository: SessionRepositoryPort,
-    private readonly passwordHasher: PasswordHasherPort,
     private readonly tokenPort: TokenPort,
     private readonly userAuthReadPort: UserAuthReadPort,
   ) {}
@@ -36,8 +34,8 @@ export class RefreshTokenCommandHandler implements ICommandHandler<
   async execute(command: RefreshTokenCommand): Promise<RefreshTokenResult> {
     const { refreshToken } = command;
 
-    // Hache le refresh token pour chercher la session correspondante
-    const refreshTokenHash = await this.passwordHasher.hash(refreshToken);
+    // Hash deterministe SHA-256 pour retrouver la session en base
+    const refreshTokenHash = this.tokenPort.hashRefreshToken(refreshToken);
     const session =
       await this.sessionRepository.findByRefreshTokenHash(refreshTokenHash);
 
@@ -70,12 +68,14 @@ export class RefreshTokenCommandHandler implements ICommandHandler<
     await this.sessionRepository.revokeSession(session.id);
 
     // Genere un nouveau refresh token et cree une nouvelle session
-    const newRefreshToken = IdGenerator.generate();
-    const newRefreshTokenHash = await this.passwordHasher.hash(newRefreshToken);
+    const newRefreshToken = this.tokenPort.generateRefreshToken();
+    const newRefreshTokenHash =
+      this.tokenPort.hashRefreshToken(newRefreshToken);
 
-    // Nouvelle session valide 7 jours
+    // Nouvelle session valide N jours (depuis la config)
+    const refreshTtlDays = this.tokenPort.getRefreshTtlDays();
     const expiresAt = new Date();
-    expiresAt.setDate(expiresAt.getDate() + 7);
+    expiresAt.setDate(expiresAt.getDate() + refreshTtlDays);
 
     await this.sessionRepository.create({
       userId: user.id,
@@ -83,12 +83,14 @@ export class RefreshTokenCommandHandler implements ICommandHandler<
       expiresAt,
     });
 
+    // Genere l'access token JWT avec les permissions embarquees
     const accessToken = this.tokenPort.generateAccessToken({
       userId: user.id,
       email: user.email,
+      permissions: DEFAULT_PERMISSIONS,
     });
 
-    const expiresIn = 15 * 60; // 15 minutes en secondes
+    const expiresIn = this.tokenPort.getAccessTtlSeconds();
 
     return {
       accessToken,

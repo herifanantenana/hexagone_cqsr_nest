@@ -1,6 +1,6 @@
 // Controller HTTP du module User
 // Situé dans Interface car c'est la porte d'entrée HTTP vers les commandes/queries CQRS user
-import { UploadThrottle } from '@common/interface/http/decorators';
+import { Can, UploadThrottle } from '@common/interface/http/decorators';
 import {
   Body,
   Controller,
@@ -9,6 +9,7 @@ import {
   HttpCode,
   HttpStatus,
   Param,
+  ParseUUIDPipe,
   Post,
   Put,
   UploadedFile,
@@ -34,6 +35,7 @@ import { UpdateProfileCommand } from '../../../application/commands/update-profi
 import { UploadAvatarCommand } from '../../../application/commands/upload-avatar.command';
 import { GetMyProfileQuery } from '../../../application/queries/get-my-profile.query';
 import { GetPublicProfileQuery } from '../../../application/queries/get-public-profile.query';
+import { InvalidFileTypeError } from '../../../domain/errors/user-errors';
 import { avatarMulterConfig } from '../config/avatar-multer.config';
 import { ProfileResponseDto } from '../dtos/profile-response.dto';
 import { PublicProfileResponseDto } from '../dtos/public-profile-response.dto';
@@ -49,7 +51,8 @@ export class UserController {
 
   @Get('me')
   @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth()
+  @Can('user', 'read')
+  @ApiBearerAuth('BearerAuth')
   @ApiOperation({ summary: 'Get my profile (authenticated user)' })
   @ApiResponse({
     status: 200,
@@ -57,6 +60,7 @@ export class UserController {
     type: ProfileResponseDto,
   })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Missing permission: user:read' })
   async getMyProfile(
     @CurrentUser() user: UserPrincipal,
   ): Promise<ProfileResponseDto> {
@@ -80,7 +84,7 @@ export class UserController {
   })
   @ApiResponse({ status: 404, description: 'User not found' })
   async getPublicProfile(
-    @Param('userId') userId: string,
+    @Param('userId', ParseUUIDPipe) userId: string,
   ): Promise<PublicProfileResponseDto> {
     return this.queryBus.execute<
       GetPublicProfileQuery,
@@ -90,7 +94,8 @@ export class UserController {
 
   @Put('me')
   @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth()
+  @Can('user', 'update')
+  @ApiBearerAuth('BearerAuth')
   @ApiOperation({ summary: 'Update my profile' })
   @ApiBody({ type: UpdateProfileDto })
   @ApiResponse({
@@ -100,6 +105,7 @@ export class UserController {
   })
   @ApiResponse({ status: 400, description: 'Invalid data' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Missing permission: user:update' })
   async updateProfile(
     @CurrentUser() user: UserPrincipal,
     @Body() dto: UpdateProfileDto,
@@ -111,9 +117,11 @@ export class UserController {
 
   @Post('me/avatar')
   @UseGuards(JwtAuthGuard)
-  @UploadThrottle() // Rate limit upload : 10 req/min par userId (évite le spam de fichiers)
+  @Can('user', 'update')
+  @HttpCode(HttpStatus.CREATED)
+  @UploadThrottle() // Rate limit upload : 10 req/min par userId (evite le spam de fichiers)
   @UseInterceptors(FileInterceptor('avatar', avatarMulterConfig))
-  @ApiBearerAuth()
+  @ApiBearerAuth('BearerAuth')
   @ApiOperation({ summary: 'Upload avatar image' })
   @ApiConsumes('multipart/form-data')
   @ApiBody({
@@ -145,7 +153,7 @@ export class UserController {
     @UploadedFile() file: Express.Multer.File,
   ): Promise<ProfileResponseDto> {
     if (!file) {
-      throw new Error('No file uploaded');
+      throw new InvalidFileTypeError('No file uploaded');
     }
 
     return this.commandBus.execute<UploadAvatarCommand, ProfileResponseDto>(
@@ -155,8 +163,9 @@ export class UserController {
 
   @Delete('me/avatar')
   @UseGuards(JwtAuthGuard)
+  @Can('user', 'update')
   @HttpCode(HttpStatus.NO_CONTENT)
-  @ApiBearerAuth()
+  @ApiBearerAuth('BearerAuth')
   @ApiOperation({ summary: 'Delete avatar image' })
   @ApiResponse({ status: 204, description: 'Avatar deleted' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })

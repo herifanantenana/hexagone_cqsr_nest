@@ -14,8 +14,13 @@ async function runMigrations() {
   try {
     console.log('Running migrations...');
 
-    // Ordre séquentiel important : les tables avant les vues
-    const migrations = ['0000_initial.sql', '0001_views.sql'];
+    // Ordre sequentiel important : tables → vues → extensions (posts, chat)
+    const migrations = [
+      '0000_initial.sql',
+      '0001_views.sql',
+      '0002_posts.sql',
+      '0003_chat.sql',
+    ];
 
     for (const migration of migrations) {
       // Lit le fichier SQL et l'exécute directement sur le pool

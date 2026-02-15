@@ -67,6 +67,49 @@ async function seed() {
       );
 
       console.log(`Posts seeded: ${postsResult.rowCount} created`);
+
+      // ─── Chat (conversations + membres + messages) ──────────────────────────
+      // Cree une conversation entre John et Jane, avec 5 messages
+      const convResult = await pool.query<{ id: string }>(
+        `
+        INSERT INTO conversations (created_by, title)
+        VALUES ($1, 'Architecture Discussion')
+        ON CONFLICT DO NOTHING
+        RETURNING id;
+        `,
+        [johnId],
+      );
+
+      if (convResult.rows.length > 0) {
+        const convId = convResult.rows[0].id;
+
+        // Ajoute John, Jane et Bob comme membres
+        await pool.query(
+          `
+          INSERT INTO conversation_members (conversation_id, user_id)
+          VALUES ($1, $2), ($1, $3), ($1, $4)
+          ON CONFLICT DO NOTHING;
+          `,
+          [convId, johnId, janeId, bobId],
+        );
+
+        // 5 messages de test dans la conversation
+        await pool.query(
+          `
+          INSERT INTO messages (conversation_id, sender_id, content)
+          VALUES
+            ($1, $2, 'Hey team! What do you think about hexagonal architecture?'),
+            ($1, $3, 'I love it! Ports and adapters make testing so much easier.'),
+            ($1, $4, 'Agreed. The domain stays pure and framework-independent.'),
+            ($1, $2, 'Exactly. And CQRS pairs really well with it.'),
+            ($1, $3, 'Shall we also discuss event sourcing next?')
+          ON CONFLICT DO NOTHING;
+          `,
+          [convId, johnId, janeId, bobId],
+        );
+
+        console.log('Chat seeded: 1 conversation + 3 members + 5 messages');
+      }
     }
 
     console.log('Seed completed successfully');

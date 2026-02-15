@@ -1,5 +1,6 @@
 // Commande CQRS : connexion d'un utilisateur (genere access + refresh tokens)
 import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
+import { DEFAULT_PERMISSIONS } from '@shared/types/user-principal.type';
 import {
   InvalidCredentialsError,
   UserDisabledError,
@@ -58,16 +59,14 @@ export class LoginCommandHandler implements ICommandHandler<
       throw new UserDisabledError();
     }
 
-    // Genere le refresh token et le stocke hashe en base
-    const refreshToken = this.tokenPort.generateRefreshToken({
-      userId: user.id,
-      email: user.email,
-    });
-    const refreshTokenHash = await this.passwordHasher.hash(refreshToken);
+    // Genere le refresh token et le stocke hashe en base (SHA-256 deterministe)
+    const refreshToken = this.tokenPort.generateRefreshToken();
+    const refreshTokenHash = this.tokenPort.hashRefreshToken(refreshToken);
 
-    // Session valide 7 jours
+    // Session valide N jours (depuis la config)
+    const refreshTtlDays = this.tokenPort.getRefreshTtlDays();
     const expiresAt = new Date();
-    expiresAt.setDate(expiresAt.getDate() + 7);
+    expiresAt.setDate(expiresAt.getDate() + refreshTtlDays);
 
     await this.sessionRepository.create({
       userId: user.id,
@@ -77,13 +76,14 @@ export class LoginCommandHandler implements ICommandHandler<
       ip,
     });
 
-    // Genere l'access token JWT (courte duree)
+    // Genere l'access token JWT avec les permissions embarquees
     const accessToken = this.tokenPort.generateAccessToken({
       userId: user.id,
       email: user.email,
+      permissions: DEFAULT_PERMISSIONS,
     });
 
-    const expiresIn = 15 * 60; // 15 minutes en secondes
+    const expiresIn = this.tokenPort.getAccessTtlSeconds();
 
     return {
       accessToken,

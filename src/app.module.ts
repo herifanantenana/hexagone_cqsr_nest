@@ -4,21 +4,24 @@
 import { ThrottlerStorageRedisService } from '@nest-lab/throttler-storage-redis';
 import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
-import { APP_GUARD } from '@nestjs/core';
+import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { ThrottlerModule } from '@nestjs/throttler';
 import Redis from 'ioredis';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
+import { LoggerModule } from './arch/common/infra/logger';
 import { REDIS_CLIENT, RedisModule } from './arch/common/infra/redis';
 import {
   THROTTLER_AUTH,
   THROTTLER_GLOBAL,
   THROTTLER_UPLOAD,
 } from './arch/common/interface/http/constants';
+import { GlobalExceptionFilter } from './arch/common/interface/http/filter/global-exception.filter';
 import {
   PermissionsGuard,
   RateLimitGuard,
 } from './arch/common/interface/http/guards';
+import { HttpLoggingInterceptor } from './arch/common/interface/http/interceptor/http-logging.interceptor';
 import { RequestIdMiddleware } from './arch/common/interface/http/middleware/request-id.middleware';
 import { AuthModule } from './arch/modules/auth/auth.module';
 import { ChatModule } from './arch/modules/chat/chat.module';
@@ -31,8 +34,11 @@ import { UserModule } from './arch/modules/user/user.module';
     // Charge .env par défaut (copier .env.example → .env avant de démarrer)
     ConfigModule.forRoot({
       isGlobal: true,
-      envFilePath: '.env',
+      envFilePath: '.env.example',
     }),
+
+    // Logger Winston global (AppLogger injectable partout)
+    LoggerModule,
 
     // Redis utilisé comme storage partagé pour les compteurs de rate limiting
     RedisModule,
@@ -72,6 +78,19 @@ import { UserModule } from './arch/modules/user/user.module';
   controllers: [AppController],
   providers: [
     AppService,
+
+    // ── Global exception filter (via DI pour injecter AppLogger) ──
+    {
+      provide: APP_FILTER,
+      useClass: GlobalExceptionFilter,
+    },
+
+    // ── Global HTTP logging interceptor (via DI pour injecter AppLogger) ──
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: HttpLoggingInterceptor,
+    },
+
     // Guards globaux (exécutés dans l'ordre de déclaration sur chaque requête)
     // 1) RateLimitGuard : throttle global + opt-in auth/upload
     {

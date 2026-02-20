@@ -2,6 +2,7 @@
 // Situé dans Interface car il est la porte d'entrée HTTP vers le domaine
 // Délègue toute la logique aux handlers CQRS (commands/queries)
 
+import { AppLogger } from '@common/infra/logger';
 import { Can } from '@common/interface/http/decorators';
 import { OptionalAuthGuard } from '@common/interface/http/guards';
 import {
@@ -16,6 +17,7 @@ import {
   Patch,
   Post,
   Query,
+  Req,
   UseGuards,
 } from '@nestjs/common';
 import { CommandBus, QueryBus } from '@nestjs/cqrs';
@@ -29,6 +31,7 @@ import {
 } from '@nestjs/swagger';
 import { PaginatedResult } from '@shared/types/pagination.type';
 import { UserPrincipal } from '@shared/types/user-principal.type';
+import { Request } from 'express';
 import { CurrentUser } from '../../../../auth/interface/http/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../../../../auth/interface/http/guards/jwt-auth.guard';
 import {
@@ -55,10 +58,15 @@ import { UpdatePostDto } from '../dtos/update-post.dto';
 @ApiTags('Posts')
 @Controller('posts')
 export class PostsController {
+  private readonly logger: AppLogger;
+
   constructor(
     private readonly commandBus: CommandBus,
     private readonly queryBus: QueryBus,
-  ) {}
+    appLogger: AppLogger,
+  ) {
+    this.logger = appLogger.withContext('Posts');
+  }
 
   // ─── POST /posts ─────────────────────────────────────────────────────────
   @Post()
@@ -79,6 +87,7 @@ export class PostsController {
   async create(
     @CurrentUser() user: UserPrincipal,
     @Body() dto: CreatePostDto,
+    @Req() req: Request,
   ): Promise<PostResponseDto> {
     const result = await this.commandBus.execute<
       CreatePostCommand,
@@ -91,6 +100,13 @@ export class PostsController {
         dto.visibility || 'public',
       ),
     );
+
+    this.logger.log('Post created', {
+      requestId: req.headers['x-request-id'] as string,
+      postId: result.id,
+      ownerId: user.userId,
+    });
+
     return {
       id: result.id,
       ownerId: result.ownerId,
@@ -167,8 +183,12 @@ export class PostsController {
     @CurrentUser() user: UserPrincipal,
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: UpdatePostDto,
+    @Req() req: Request,
   ): Promise<PostResponseDto> {
-    return this.commandBus.execute<UpdatePostCommand, UpdatePostResult>(
+    const result = await this.commandBus.execute<
+      UpdatePostCommand,
+      UpdatePostResult
+    >(
       new UpdatePostCommand(
         user.userId,
         id,
@@ -177,6 +197,14 @@ export class PostsController {
         dto.visibility,
       ),
     );
+
+    this.logger.log('Post updated', {
+      requestId: req.headers['x-request-id'] as string,
+      postId: id,
+      ownerId: user.userId,
+    });
+
+    return result;
   }
 
   // ─── DELETE /posts/:id ───────────────────────────────────────────────────
@@ -194,9 +222,16 @@ export class PostsController {
   async delete(
     @CurrentUser() user: UserPrincipal,
     @Param('id', ParseUUIDPipe) id: string,
+    @Req() req: Request,
   ): Promise<void> {
     await this.commandBus.execute<DeletePostCommand, void>(
       new DeletePostCommand(user.userId, id),
     );
+
+    this.logger.log('Post deleted', {
+      requestId: req.headers['x-request-id'] as string,
+      postId: id,
+      ownerId: user.userId,
+    });
   }
 }

@@ -16,6 +16,7 @@ Ce projet montre comment structurer une vraie application back-end professionnel
 - [Swagger (documentation API)](#swagger-documentation-api)
 - [Exemples curl](#exemples-curl)
 - [API Endpoints](#api-endpoints)
+- [Logging (Winston)](#logging-winston)
 - [Structure des dossiers](#structure-des-dossiers)
 - [Comment ajouter un nouveau module](#comment-ajouter-un-nouveau-module)
 - [Scripts disponibles](#scripts-disponibles)
@@ -452,6 +453,157 @@ curl -X POST http://localhost:3000/auth/change-password \
 
 ---
 
+## Logging (Winston)
+
+Le projet utilise **Winston** comme logger central, intégré via **nest-winston**.
+
+### Niveaux de log
+
+| Niveau  | Priorité | Usage                                            |
+| ------- | -------- | ------------------------------------------------ |
+| `error` | 0        | Erreurs 5xx, exceptions non gérées               |
+| `warn`  | 1        | Erreurs 4xx, login échoué, opérations refusées   |
+| `info`  | 2        | Lifecycle NestJS, actions métier réussies        |
+| `http`  | 3        | Requêtes entrantes/sortantes (incoming/outgoing) |
+| `debug` | 4        | Informations de débogage détaillées              |
+
+### Fichiers de log (en production)
+
+| Fichier                        | Contenu                                      |
+| ------------------------------ | -------------------------------------------- |
+| `logs/error-YYYY-MM-DD.log`    | Erreurs uniquement (avec stack trace si 5xx) |
+| `logs/warn-YYYY-MM-DD.log`     | Warnings uniquement                          |
+| `logs/combined-YYYY-MM-DD.log` | Tout (error + warn + info)                   |
+| `logs/http-YYYY-MM-DD.log`     | Requêtes HTTP (incoming/outgoing)            |
+
+Les fichiers sont en **JSON structuré** (facile à parser avec `jq`, ELK, Datadog...).
+La rotation quotidienne est assurée par `winston-daily-rotate-file` (rétention configurable).
+
+### Variables d'environnement
+
+| Variable         | Défaut                        | Description                                          |
+| ---------------- | ----------------------------- | ---------------------------------------------------- |
+| `LOG_LEVEL`      | `info`                        | Niveau minimum (error, warn, info, http, debug)      |
+| `LOG_DIR`        | `logs`                        | Dossier destination des fichiers                     |
+| `LOG_CONSOLE`    | `true`                        | Activer les logs console (format lisible, coloré)    |
+| `LOG_FILE`       | `false` (dev) / `true` (prod) | Activer la persistence en fichiers                   |
+| `LOG_HTTP`       | `true`                        | Activer les logs HTTP (requêtes entrantes/sortantes) |
+| `LOG_JSON_FILES` | `false` (dev) / `true` (prod) | Format JSON dans les fichiers                        |
+| `LOG_ROTATE`     | `false` (dev) / `true` (prod) | Rotation quotidienne                                 |
+| `LOG_MAX_FILES`  | `14d`                         | Durée de rétention des fichiers                      |
+
+### Exemple de log console (développement)
+
+```
+2025-01-15 10:30:45 info [Bootstrap] Application is running on: http://localhost:3000
+2025-01-15 10:30:50 http [HTTP] --> GET /posts {requestId: f47ac10b-58cc-4372-a567-0e02b2c3d479}
+2025-01-15 10:30:50 http [HTTP] <-- GET /posts 200 12ms {requestId: f47ac10b-58cc-4372-a567-0e02b2c3d479}
+2025-01-15 10:30:55 info [Auth] Login success {requestId: a1b2c3d4, email: john@example.com}
+2025-01-15 10:31:00 warn [Auth] Login failed {requestId: e5f6g7h8, email: hacker@evil.com}
+2025-01-15 10:31:05 warn [ExceptionFilter] POST /auth/login 401 - Invalid credentials
+```
+
+### Exemple de log fichier JSON (production)
+
+```json
+{"level":"info","message":"Login success","context":"Auth","requestId":"a1b2c3d4","email":"john@example.com","timestamp":"2025-01-15T10:30:55.000Z"}
+{"level":"error","message":"POST /api/crash 500 - Internal server error","context":"ExceptionFilter","requestId":"x9y0z1","statusCode":500,"stack":"Error: ...","timestamp":"2025-01-15T10:31:10.000Z"}
+```
+
+### Comment utiliser le logger dans un service/controller
+
+```typescript
+import { AppLogger } from '@common/infra/logger';
+
+@Controller('example')
+export class ExampleController {
+  private readonly logger: AppLogger;
+
+  constructor(appLogger: AppLogger) {
+    this.logger = appLogger.withContext('Example'); // Contexte fixe
+  }
+
+  @Get()
+  async doSomething(@Req() req: Request) {
+    this.logger.log('Operation success', {
+      requestId: req.headers['x-request-id'],
+      customData: 'some-value',
+    });
+  }
+}
+```
+
+### Points d'instrumentation (logs applicatifs)
+
+Les logs sont branchés sur les points critiques :
+
+**Auth** (contexte `[Auth]`) :
+
+- Signup success (userId, email)
+- Login success/fail (email, ip) — jamais le mot de passe ni les tokens
+- Token refresh success/fail
+- Logout (userId)
+- Change password success/fail (userId)
+
+**Posts** (contexte `[Posts]`) :
+
+- Create (postId, ownerId, requestId)
+- Update (postId, ownerId, requestId)
+- Delete (postId, ownerId, requestId)
+
+**HTTP** (contexte `[HTTP]`) :
+
+- Incoming : method, path, ip, userAgent, requestId, userId (si connecté)
+- Outgoing : statusCode, durationMs, requestId
+- Niveau adapté : 2xx/3xx → http, 4xx → warn, 5xx → error
+
+### Comment tester les logs
+
+```bash
+# Activer les fichiers de log en dev
+LOG_FILE=true LOG_ROTATE=false pnpm dev
+
+# Provoquer un 401 (credentials invalides)
+curl -s -X POST http://localhost:3000/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"test@test.com","password":"wrong"}'
+# → Vérifier logs/warn.log
+
+# Provoquer un 404
+curl -s http://localhost:3000/posts/00000000-0000-0000-0000-000000000000
+# → Vérifier logs/warn.log
+
+# Requêtes normales
+curl -s http://localhost:3000/posts
+# → Vérifier logs/http.log
+
+# Vérifier les fichiers
+ls -la logs/
+cat logs/http.log | head -5
+cat logs/warn.log | head -5
+```
+
+### Architecture des fichiers logger
+
+```
+arch/common/infra/logger/
+├── logger.config.ts       # Configuration (ENV → LoggerConfig)
+├── winston.instance.ts    # Factory Winston (transports console + fichiers)
+├── logger.service.ts      # AppLogger (wrapper injectable, compatible LoggerService)
+├── logger.module.ts       # Module global (fournit AppLogger partout)
+└── index.ts               # Barrel export
+```
+
+### Interdictions (sécurité)
+
+Les logs ne doivent **jamais** contenir :
+
+- Mots de passe (currentPassword, newPassword)
+- Tokens (accessToken, refreshToken)
+- Secrets d'environnement (JWT_ACCESS_SECRET, REDIS_URL)
+
+---
+
 ## Structure des dossiers
 
 ```
@@ -469,11 +621,12 @@ src/
     │   │   ├── migrations/          # SQL exécuté par `pnpm migrate`
     │   │   └── seeds/               # Données de test `pnpm seed`
     │   ├── infra/redis/             # Client Redis partagé (rate limiting)
+    │   ├── infra/logger/            # Winston : config, factory, AppLogger, module
     │   └── interface/http/          # Guards, decorators, filter, interceptor, middleware
     │       ├── guards/              # PermissionsGuard, OptionalAuthGuard, RateLimitGuard
     │       ├── decorators/          # @Can(), @AuthThrottle(), @UploadThrottle()
     │       ├── filter/              # GlobalExceptionFilter (erreurs domaine → HTTP)
-    │       ├── interceptor/         # LoggingInterceptor (requestId + durée)
+    │       ├── interceptor/         # HttpLoggingInterceptor (Winston, incoming/outgoing)
     │       └── middleware/          # RequestIdMiddleware (x-request-id)
     │
     ├── modules/
@@ -562,11 +715,11 @@ src/
 ```
 Client → Middleware (RequestId)
        → Guard      (RateLimit → Permissions)
-       → Interceptor (Logging — début chrono)
+       → Interceptor (HttpLogging — log incoming + début chrono)
        → Pipe       (ValidationPipe — valide les DTOs)
        → Controller → CommandBus/QueryBus → Handler → Port → Adapter → DB
-       → Interceptor (Logging — fin chrono, log durée)
-       → Filter     (si erreur → GlobalExceptionFilter → réponse JSON normalisée)
+       → Interceptor (HttpLogging — log outgoing + durée)
+       → Filter     (si erreur → GlobalExceptionFilter → log Winston + réponse JSON)
 ```
 
 ---

@@ -5,13 +5,17 @@ import { ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import { WinstonModule } from 'nest-winston';
 import { join } from 'path';
 import { AppModule } from './app.module';
-import { GlobalExceptionFilter } from './arch/common/interface/http/filter/global-exception.filter';
-import { LoggingInterceptor } from './arch/common/interface/http/interceptor/logging.interceptor';
+import { winstonInstance } from './arch/common/infra/logger';
 
 async function bootstrap() {
-  const app = await NestFactory.create<NestExpressApplication>(AppModule);
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, {
+    // Remplace le logger NestJS natif par Winston
+    // Tous les logs internes de NestJS (lifecycle, routes, errors) passent par Winston
+    logger: WinstonModule.createLogger({ instance: winstonInstance }),
+  });
 
   // Trust proxy : indispensable derrière un reverse proxy (Nginx, Cloudflare…)
   // Active req.ip avec la vraie IP client (x-forwarded-for)
@@ -30,17 +34,16 @@ async function bootstrap() {
     }),
   );
 
-  // Global exception filter : attrape toutes les exceptions (domaine + HTTP + inattendues)
-  // Traduit les erreurs domaine en codes HTTP via le nom de la classe d'erreur
-  app.useGlobalFilters(new GlobalExceptionFilter());
-
-  // Global interceptor : log "[requestId] --> GET /path" et "<-- GET /path 200 12ms"
-  app.useGlobalInterceptors(new LoggingInterceptor());
+  // GlobalExceptionFilter et HttpLoggingInterceptor sont branchés via APP_FILTER / APP_INTERCEPTOR
+  // dans app.module.ts (injection DI nécessaire pour AppLogger)
 
   // Serve static files (avatars uploadés dans ./uploads)
   app.useStaticAssets(join(process.cwd(), 'uploads'), { prefix: '/uploads' });
 
   app.enableCors(); // Autorise toutes les origines (à restreindre en production)
+
+  // Active les hooks de shutdown pour fermer proprement les connexions (Redis, DB)
+  app.enableShutdownHooks();
 
   // ─── Swagger (OpenAPI) ─────────────────────────────────────────────────
   // Documentation interactive accessible sur /api/docs
@@ -72,7 +75,13 @@ async function bootstrap() {
 
   const port = process.env.PORT || 3000;
   await app.listen(port);
-  console.log(`Application is running on: http://localhost:${port}`);
-  console.log(`Swagger docs available at: http://localhost:${port}/api/docs`);
+
+  winstonInstance.info(`Application is running on: http://localhost:${port}`, {
+    context: 'Bootstrap',
+  });
+  winstonInstance.info(
+    `Swagger docs available at: http://localhost:${port}/api/docs`,
+    { context: 'Bootstrap' },
+  );
 }
 void bootstrap();

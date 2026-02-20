@@ -1,19 +1,25 @@
+// @Catch() sans argument → attrape TOUTES les exceptions (HTTP + domain + inattendues)
+// Traduit les erreurs domaine en codes HTTP appropriés
+// Hexagonal : le domaine ne connaît pas HTTP, c'est ce filtre qui fait le mapping
+// Les erreurs 5xx incluent la stack trace dans les logs (pas dans la réponse)
+
+import { AppLogger } from '@common/infra/logger';
 import {
   ArgumentsHost,
   Catch,
   ExceptionFilter,
   HttpException,
   HttpStatus,
-  Logger,
 } from '@nestjs/common';
 import { Request, Response } from 'express';
 
-// @Catch() sans argument → attrape TOUTES les exceptions (HTTP + domain + inattendues)
-// Traduit les erreurs domaine en codes HTTP appropriés
-// Hexagonal : le domaine ne connaît pas HTTP, c'est ce filtre qui fait le mapping
 @Catch()
 export class GlobalExceptionFilter implements ExceptionFilter {
-  private readonly logger = new Logger(GlobalExceptionFilter.name);
+  private readonly logger: AppLogger;
+
+  constructor(appLogger: AppLogger) {
+    this.logger = appLogger.withContext('ExceptionFilter');
+  }
 
   catch(exception: unknown, host: ArgumentsHost) {
     const ctx = host.switchToHttp();
@@ -44,7 +50,6 @@ export class GlobalExceptionFilter implements ExceptionFilter {
     } else if (exception instanceof Error) {
       // Mapping erreurs domaine → HTTP status (par nom de classe)
       // Chaque module domaine définit ses propres erreurs ; on les traduit ici
-      // Pour ajouter un nouveau module : ajouter ses erreurs dans le switch ci-dessous
       const errorName = exception.constructor.name;
 
       switch (errorName) {
@@ -123,16 +128,33 @@ export class GlobalExceptionFilter implements ExceptionFilter {
           break;
 
         default:
-          // Erreur domaine non mappée → 500 avec le message (à investiguer et ajouter au switch)
+          // Erreur domaine non mappée → 500 (à investiguer et ajouter au switch)
           message = exception.message;
       }
     }
 
-    // Log avec requestId pour corrélation
-    this.logger.error(
-      `[${requestId}] ${request.method} ${request.url} - ${status} - ${String(message)}`,
-      exception instanceof Error ? exception.stack : undefined,
-    );
+    // Log avec niveau adapté au status code
+    const logMeta = {
+      requestId,
+      statusCode: status,
+      method: request.method,
+      path: request.url,
+      ...(exception instanceof Error && (status as number) >= 500
+        ? { stack: exception.stack }
+        : {}),
+    };
+
+    if ((status as number) >= 500) {
+      this.logger.error(
+        `${request.method} ${request.url} ${status} - ${String(message)}`,
+        logMeta,
+      );
+    } else if ((status as number) >= 400) {
+      this.logger.warn(
+        `${request.method} ${request.url} ${status} - ${String(message)}`,
+        logMeta,
+      );
+    }
 
     // Format de réponse standardisé (identique pour toutes les erreurs)
     response.status(status).json({

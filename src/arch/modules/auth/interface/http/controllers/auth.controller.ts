@@ -1,5 +1,6 @@
 // Controller HTTP du module Auth
 // Situé dans Interface car c'est la porte d'entrée HTTP vers les commandes CQRS auth
+import { AppLogger } from '@common/infra/logger';
 import { AuthThrottle, Can } from '@common/interface/http/decorators';
 import {
   Body,
@@ -35,7 +36,14 @@ import { JwtAuthGuard } from '../guards/jwt-auth.guard';
 @ApiTags('Auth')
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly commandBus: CommandBus) {}
+  private readonly logger: AppLogger;
+
+  constructor(
+    private readonly commandBus: CommandBus,
+    appLogger: AppLogger,
+  ) {
+    this.logger = appLogger.withContext('Auth');
+  }
 
   @Post('signup')
   @AuthThrottle()
@@ -51,11 +59,21 @@ export class AuthController {
   @ApiResponse({ status: 429, description: 'Too many requests' })
   async signup(
     @Body() dto: SignupDto,
+    @Req() req: Request,
   ): Promise<{ userId: string; email: string; displayName: string }> {
-    return this.commandBus.execute<
+    const requestId = req.headers['x-request-id'] as string;
+    const result = await this.commandBus.execute<
       SignupCommand,
       { userId: string; email: string; displayName: string }
     >(new SignupCommand(dto.email, dto.password, dto.displayName));
+
+    // On ne log jamais le mot de passe ni le token
+    this.logger.log('Signup success', {
+      requestId,
+      userId: result.userId,
+      email: result.email,
+    });
+    return result;
   }
 
   @Post('login')
@@ -76,16 +94,34 @@ export class AuthController {
   ): Promise<AuthResponseDto> {
     const userAgent = req.headers['user-agent'];
     const ip = req.ip || req.socket?.remoteAddress || 'unknown';
+    const requestId = req.headers['x-request-id'] as string;
 
-    const result = await this.commandBus.execute<
-      LoginCommand,
-      Omit<AuthResponseDto, 'tokenType'>
-    >(new LoginCommand(dto.email, dto.password, userAgent, ip));
+    try {
+      const result = await this.commandBus.execute<
+        LoginCommand,
+        Omit<AuthResponseDto, 'tokenType'>
+      >(new LoginCommand(dto.email, dto.password, userAgent, ip));
 
-    return {
-      ...result,
-      tokenType: 'Bearer',
-    };
+      // On ne log jamais le mot de passe ni les tokens
+      this.logger.log('Login success', {
+        requestId,
+        email: dto.email,
+        ip,
+      });
+
+      return {
+        ...result,
+        tokenType: 'Bearer',
+      };
+    } catch (error) {
+      // Log de l'échec sans infos sensibles
+      this.logger.warn('Login failed', {
+        requestId,
+        email: dto.email,
+        ip,
+      });
+      throw error;
+    }
   }
 
   @Post('refresh')
@@ -106,16 +142,26 @@ export class AuthController {
   @ApiResponse({ status: 429, description: 'Too many requests' })
   async refresh(
     @Body('refreshToken') refreshToken: string,
+    @Req() req: Request,
   ): Promise<AuthResponseDto> {
-    const result = await this.commandBus.execute<
-      RefreshTokenCommand,
-      Omit<AuthResponseDto, 'tokenType'>
-    >(new RefreshTokenCommand(refreshToken));
+    const requestId = req.headers['x-request-id'] as string;
 
-    return {
-      ...result,
-      tokenType: 'Bearer',
-    };
+    try {
+      const result = await this.commandBus.execute<
+        RefreshTokenCommand,
+        Omit<AuthResponseDto, 'tokenType'>
+      >(new RefreshTokenCommand(refreshToken));
+
+      // On ne log jamais le refresh token
+      this.logger.log('Token refresh success', { requestId });
+      return {
+        ...result,
+        tokenType: 'Bearer',
+      };
+    } catch (error) {
+      this.logger.warn('Token refresh failed', { requestId });
+      throw error;
+    }
   }
 
   @Post('logout')
@@ -127,10 +173,17 @@ export class AuthController {
   @ApiResponse({ status: 204, description: 'Logged out' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 403, description: 'Missing permission' })
-  async logout(@CurrentUser() user: UserPrincipal): Promise<void> {
+  async logout(
+    @CurrentUser() user: UserPrincipal,
+    @Req() req: Request,
+  ): Promise<void> {
     await this.commandBus.execute<LogoutCommand, void>(
       new LogoutCommand(user.userId),
     );
+    this.logger.log('Logout success', {
+      requestId: req.headers['x-request-id'] as string,
+      userId: user.userId,
+    });
   }
 
   @Post('change-password')
@@ -152,13 +205,29 @@ export class AuthController {
   async changePassword(
     @CurrentUser() user: UserPrincipal,
     @Body() dto: ChangePasswordDto,
+    @Req() req: Request,
   ): Promise<void> {
-    await this.commandBus.execute<ChangePasswordCommand, void>(
-      new ChangePasswordCommand(
-        user.userId,
-        dto.currentPassword,
-        dto.newPassword,
-      ),
-    );
+    const requestId = req.headers['x-request-id'] as string;
+
+    try {
+      await this.commandBus.execute<ChangePasswordCommand, void>(
+        new ChangePasswordCommand(
+          user.userId,
+          dto.currentPassword,
+          dto.newPassword,
+        ),
+      );
+      // On ne log jamais les mots de passe
+      this.logger.log('Password changed', {
+        requestId,
+        userId: user.userId,
+      });
+    } catch (error) {
+      this.logger.warn('Change password failed', {
+        requestId,
+        userId: user.userId,
+      });
+      throw error;
+    }
   }
 }

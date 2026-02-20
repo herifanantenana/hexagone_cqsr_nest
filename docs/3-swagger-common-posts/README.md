@@ -58,6 +58,7 @@ email: string;
 ```
 
 **Décorateurs fréquents** :
+
 - `@ApiProperty()` — Champ obligatoire
 - `@ApiPropertyOptional()` — Champ optionnel
 - `@ApiResponse()` — Sur le controller, décrit les réponses possibles
@@ -66,6 +67,7 @@ email: string;
 - `@ApiConsumes('multipart/form-data')` — Pour l'upload
 
 **Pagination** — Créer un DTO réutilisable :
+
 ```
 class PaginatedResponseDto<T> {
   data: T[];
@@ -110,24 +112,25 @@ GET /health → { status: "ok", timestamp: "..." }
 ### Étape 6 — Composants transverses (vérification et branchement)
 
 Vérifie que CHAQUE composant ci-dessous est :
+
 1. **Créé** (le fichier existe)
 2. **Branché** (enregistré dans `app.module.ts` ou appliqué via `configure`)
 3. **Utilisé** (au moins un endpoint l'utilise)
 
-| Composant              | Enregistrement                          | Vérifié ? |
-|------------------------|-----------------------------------------|-----------|
-| `RequestIdMiddleware`  | `consumer.apply(...).forRoutes('*')`    |           |
-| `GlobalExceptionFilter`| `{ provide: APP_FILTER, useClass: ... }`|           |
-| `HttpLoggingInterceptor`| `{ provide: APP_INTERCEPTOR, useClass: ... }` |   |
-| `RateLimitGuard`       | `{ provide: APP_GUARD, useClass: ... }` |           |
-| `PermissionsGuard`     | `{ provide: APP_GUARD, useClass: ... }` |           |
+| Composant                | Enregistrement                                | Vérifié ? |
+| ------------------------ | --------------------------------------------- | --------- |
+| `RequestIdMiddleware`    | `consumer.apply(...).forRoutes('*')`          |           |
+| `GlobalExceptionFilter`  | `{ provide: APP_FILTER, useClass: ... }`      |           |
+| `HttpLoggingInterceptor` | `{ provide: APP_INTERCEPTOR, useClass: ... }` |           |
+| `RateLimitGuard`         | `{ provide: APP_GUARD, useClass: ... }`       |           |
+| `PermissionsGuard`       | `{ provide: APP_GUARD, useClass: ... }`       |           |
 
 **Guards spécifiques (pas globaux)** :
 
-| Guard               | Utilisation                                | Comment          |
-|---------------------|--------------------------------------------|------------------|
-| `JwtAuthGuard`      | Routes protégées (auth requise)            | `@UseGuards(JwtAuthGuard)` sur le endpoint |
-| `OptionalAuthGuard` | Routes publiques enrichies si connecté      | `@UseGuards(OptionalAuthGuard)` |
+| Guard               | Utilisation                            | Comment                                    |
+| ------------------- | -------------------------------------- | ------------------------------------------ |
+| `JwtAuthGuard`      | Routes protégées (auth requise)        | `@UseGuards(JwtAuthGuard)` sur le endpoint |
+| `OptionalAuthGuard` | Routes publiques enrichies si connecté | `@UseGuards(OptionalAuthGuard)`            |
 
 ### Étape 7 — Décorateur `@Can(resource, action)`
 
@@ -141,6 +144,7 @@ Ce décorateur pose un metadata sur le handler. Le `PermissionsGuard` le lit :
 4. Si `@Can()` absent → le guard laisse passer (pas de restriction)
 
 **Utilisation** :
+
 ```
 @Can('posts', 'create')
 @UseGuards(JwtAuthGuard)
@@ -153,6 +157,7 @@ createPost(...) { ... }
 **Emplacement** : `src/arch/common/interface/http/guards/optional-auth.guard.ts`
 
 Étend `AuthGuard('jwt')` mais ne lève **jamais** d'erreur si le token est absent :
+
 - Token présent et valide → `req.user` est rempli
 - Token absent → `req.user` reste `undefined`, la requête continue
 - Token invalide/expiré → peut être traité comme absent (graceful)
@@ -166,6 +171,7 @@ createPost(...) { ... }
 Ajouter dans `schema.ts` :
 
 **Table `posts`** :
+
 - `id` (UUID PK)
 - `ownerId` (UUID FK → users, CASCADE)
 - `title` (VARCHAR 255)
@@ -174,6 +180,7 @@ Ajouter dans `schema.ts` :
 - `createdAt`, `updatedAt` (timestamps)
 
 **View `postsPublicView`** :
+
 - Sélectionne les posts où `visibility = 'public'`
 - Joint le `displayName` du owner (dénormalisation pour la lecture)
 
@@ -251,18 +258,19 @@ PostRepositoryPort:
 #### Infrastructure — Adapter
 
 `PostRepositoryAdapter` implémente `PostRepositoryPort` avec des requêtes Drizzle :
+
 - `findPublic` → lit depuis `postsPublicView`
 - `findPublicAndOwned` → union des posts publics + posts privés du owner
 
 #### Interface — Controller
 
-| Route           | Méthode | Auth         | Guard/Décorateur             | Description               |
-|-----------------|---------|--------------|------------------------------|---------------------------|
-| `GET /posts`    | Query   | OptionalAuth | `@UseGuards(OptionalAuthGuard)` | Liste paginée           |
-| `GET /posts/:id`| Query   | OptionalAuth | `@UseGuards(OptionalAuthGuard)` | Détail (policy appliquée)|
-| `POST /posts`   | Command | JWT          | `@UseGuards(JwtAuthGuard)` + `@Can('posts', 'create')` | Création     |
-| `PATCH /posts/:id`| Command | JWT        | `@UseGuards(JwtAuthGuard)`    | Mise à jour (ownership)  |
-| `DELETE /posts/:id`| Command | JWT       | `@UseGuards(JwtAuthGuard)`    | Suppression (ownership)  |
+| Route               | Méthode | Auth         | Guard/Décorateur                                       | Description               |
+| ------------------- | ------- | ------------ | ------------------------------------------------------ | ------------------------- |
+| `GET /posts`        | Query   | OptionalAuth | `@UseGuards(OptionalAuthGuard)`                        | Liste paginée             |
+| `GET /posts/:id`    | Query   | OptionalAuth | `@UseGuards(OptionalAuthGuard)`                        | Détail (policy appliquée) |
+| `POST /posts`       | Command | JWT          | `@UseGuards(JwtAuthGuard)` + `@Can('posts', 'create')` | Création                  |
+| `PATCH /posts/:id`  | Command | JWT          | `@UseGuards(JwtAuthGuard)`                             | Mise à jour (ownership)   |
+| `DELETE /posts/:id` | Command | JWT          | `@UseGuards(JwtAuthGuard)`                             | Suppression (ownership)   |
 
 #### Migrations et Seeds
 
@@ -292,20 +300,20 @@ PostRepositoryPort:
 
 ## Où mettre quoi dans /arch
 
-| Élément                | Couche         | Emplacement                                          |
-|------------------------|----------------|------------------------------------------------------|
-| Post model             | Domain         | `modules/posts/domain/models/`                       |
-| Post errors            | Domain         | `modules/posts/domain/errors/`                       |
-| Visibility policy      | Domain         | `modules/posts/domain/services/`                     |
-| Commands/Queries       | Application    | `modules/posts/application/commands/` et `queries/`  |
-| PostRepositoryPort     | Application    | `modules/posts/application/ports/`                   |
-| PostRepositoryAdapter  | Infrastructure | `modules/posts/infrastructure/adapters/`             |
-| PostsController        | Interface      | `modules/posts/interface/http/`                      |
-| DTOs (create, update)  | Interface      | `modules/posts/interface/http/dto/`                  |
-| Swagger config         | Interface      | `main.ts`                                            |
-| `@Can()` decorator     | Interface      | `common/interface/http/decorators/`                  |
-| PermissionsGuard       | Interface      | `common/interface/http/guards/`                      |
-| OptionalAuthGuard      | Interface      | `common/interface/http/guards/`                      |
+| Élément               | Couche         | Emplacement                                         |
+| --------------------- | -------------- | --------------------------------------------------- |
+| Post model            | Domain         | `modules/posts/domain/models/`                      |
+| Post errors           | Domain         | `modules/posts/domain/errors/`                      |
+| Visibility policy     | Domain         | `modules/posts/domain/services/`                    |
+| Commands/Queries      | Application    | `modules/posts/application/commands/` et `queries/` |
+| PostRepositoryPort    | Application    | `modules/posts/application/ports/`                  |
+| PostRepositoryAdapter | Infrastructure | `modules/posts/infrastructure/adapters/`            |
+| PostsController       | Interface      | `modules/posts/interface/http/`                     |
+| DTOs (create, update) | Interface      | `modules/posts/interface/http/dto/`                 |
+| Swagger config        | Interface      | `main.ts`                                           |
+| `@Can()` decorator    | Interface      | `common/interface/http/decorators/`                 |
+| PermissionsGuard      | Interface      | `common/interface/http/guards/`                     |
+| OptionalAuthGuard     | Interface      | `common/interface/http/guards/`                     |
 
 ---
 
@@ -324,17 +332,17 @@ NODE_ENV=development
 
 ## Pièges à éviter
 
-| Piège | Pourquoi | Solution |
-|-------|----------|----------|
-| Décorateurs Swagger sur des routes inexistantes | Swagger affiche des endpoints fantômes | Documenter uniquement ce qui existe |
-| `@ApiBearerAuth()` sans `addBearerAuth()` dans le builder | Le bouton Authorize n'apparaît pas | Ajouter `addBearerAuth()` dans `DocumentBuilder` |
-| `@Can()` sans `JwtAuthGuard` | Le PermissionsGuard n'a pas de `req.user` → crash ou 401 inattendu | Toujours combiner `@UseGuards(JwtAuthGuard)` avec `@Can()` |
-| Vérifier l'ownership dans le controller | Logique métier dans l'Interface | La vérification d'ownership est dans le **handler CQRS** (Application), la policy de visibilité dans **Domain** |
-| Oublier `OptionalAuthGuard` sur les routes de lecture | Posts privés de l'user connecté invisibles | Utiliser `OptionalAuthGuard` pour enrichir le contexte |
-| Ne pas paginer les listes | `GET /posts` retourne 10 000 lignes | Toujours paginer. DTO avec `page` + `limit` (défauts raisonnables : page=1, limit=20) |
-| View Drizzle sans `WITH (security_barrier)` ou mal filtrée | Fuite de données privées | Vérifier que la view ne retourne QUE les posts publics |
-| Créer un PermissionsGuard qui fait des appels DB | Lent, couplé à l'infra, non testable | Les permissions sont dans le JWT payload, le guard ne lit que ça |
-| Déclarer des composants communs sans les brancher | Faux sentiment de sécurité, rien n'est actif | Vérifier `app.module.ts` : chaque composant doit y être enregistré |
+| Piège                                                      | Pourquoi                                                           | Solution                                                                                                        |
+| ---------------------------------------------------------- | ------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------- |
+| Décorateurs Swagger sur des routes inexistantes            | Swagger affiche des endpoints fantômes                             | Documenter uniquement ce qui existe                                                                             |
+| `@ApiBearerAuth()` sans `addBearerAuth()` dans le builder  | Le bouton Authorize n'apparaît pas                                 | Ajouter `addBearerAuth()` dans `DocumentBuilder`                                                                |
+| `@Can()` sans `JwtAuthGuard`                               | Le PermissionsGuard n'a pas de `req.user` → crash ou 401 inattendu | Toujours combiner `@UseGuards(JwtAuthGuard)` avec `@Can()`                                                      |
+| Vérifier l'ownership dans le controller                    | Logique métier dans l'Interface                                    | La vérification d'ownership est dans le **handler CQRS** (Application), la policy de visibilité dans **Domain** |
+| Oublier `OptionalAuthGuard` sur les routes de lecture      | Posts privés de l'user connecté invisibles                         | Utiliser `OptionalAuthGuard` pour enrichir le contexte                                                          |
+| Ne pas paginer les listes                                  | `GET /posts` retourne 10 000 lignes                                | Toujours paginer. DTO avec `page` + `limit` (défauts raisonnables : page=1, limit=20)                           |
+| View Drizzle sans `WITH (security_barrier)` ou mal filtrée | Fuite de données privées                                           | Vérifier que la view ne retourne QUE les posts publics                                                          |
+| Créer un PermissionsGuard qui fait des appels DB           | Lent, couplé à l'infra, non testable                               | Les permissions sont dans le JWT payload, le guard ne lit que ça                                                |
+| Déclarer des composants communs sans les brancher          | Faux sentiment de sécurité, rien n'est actif                       | Vérifier `app.module.ts` : chaque composant doit y être enregistré                                              |
 
 ---
 

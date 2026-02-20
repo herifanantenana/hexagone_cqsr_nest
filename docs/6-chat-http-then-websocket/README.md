@@ -28,6 +28,7 @@ Le principe fondamental : **le WebSocket n'est qu'un transport**. Toute la logiq
 Avant d'ajouter le chat, s'assurer que tout le reste est clean. Référence : le Concept 5 (finalisation).
 
 **Checklist rapide** :
+
 - [ ] Auth cycle complet OK (signup → login → refresh → logout → change-password)
 - [ ] Posts CRUD OK avec visibilité/ownership
 - [ ] Rate limiting actif
@@ -47,33 +48,33 @@ Ajouter dans `schema.ts` :
 
 **Table `conversations`** :
 
-| Colonne    | Type              | Notes                            |
-|------------|-------------------|----------------------------------|
-| `id`       | UUID PK           | `gen_random_uuid()`              |
-| `createdBy`| UUID FK → users   | CASCADE                          |
-| `title`    | VARCHAR 255       | Nullable (optionnel)             |
-| `createdAt`| TIMESTAMP WITH TZ | `defaultNow()`                   |
-| `updatedAt`| TIMESTAMP WITH TZ | `defaultNow()`                   |
+| Colonne     | Type              | Notes                |
+| ----------- | ----------------- | -------------------- |
+| `id`        | UUID PK           | `gen_random_uuid()`  |
+| `createdBy` | UUID FK → users   | CASCADE              |
+| `title`     | VARCHAR 255       | Nullable (optionnel) |
+| `createdAt` | TIMESTAMP WITH TZ | `defaultNow()`       |
+| `updatedAt` | TIMESTAMP WITH TZ | `defaultNow()`       |
 
 **Table `conversation_members`** :
 
-| Colonne          | Type              | Notes                        |
-|------------------|-------------------|------------------------------|
-| `conversationId` | UUID FK → conversations | CASCADE, PK composite   |
-| `userId`         | UUID FK → users   | CASCADE, PK composite        |
-| `joinedAt`       | TIMESTAMP WITH TZ | `defaultNow()`               |
+| Colonne          | Type                    | Notes                 |
+| ---------------- | ----------------------- | --------------------- |
+| `conversationId` | UUID FK → conversations | CASCADE, PK composite |
+| `userId`         | UUID FK → users         | CASCADE, PK composite |
+| `joinedAt`       | TIMESTAMP WITH TZ       | `defaultNow()`        |
 
 **Clé primaire composite** : `(conversationId, userId)` — un user ne peut être membre qu'une fois par conversation.
 
 **Table `messages`** :
 
-| Colonne          | Type              | Notes                        |
-|------------------|-------------------|------------------------------|
-| `id`             | UUID PK           | `gen_random_uuid()`          |
-| `conversationId` | UUID FK → conversations | CASCADE                |
-| `senderId`       | UUID FK → users   | CASCADE                      |
-| `content`        | TEXT              | Le message                   |
-| `createdAt`      | TIMESTAMP WITH TZ | `defaultNow()`               |
+| Colonne          | Type                    | Notes               |
+| ---------------- | ----------------------- | ------------------- |
+| `id`             | UUID PK                 | `gen_random_uuid()` |
+| `conversationId` | UUID FK → conversations | CASCADE             |
+| `senderId`       | UUID FK → users         | CASCADE             |
+| `content`        | TEXT                    | Le message          |
+| `createdAt`      | TIMESTAMP WITH TZ       | `defaultNow()`      |
 
 #### B.2 — Migrations et Seeds
 
@@ -83,6 +84,7 @@ pnpm migrate:push
 ```
 
 Seed (`seed.dev.ts`) — ajouter :
+
 - 1 conversation entre user1 et user2
 - Membership pour les 2 users
 - 5 messages échangés
@@ -137,12 +139,14 @@ src/arch/modules/chat/
 **Models** : Propriétés simples (id, userId, content, etc.)
 
 **Errors** :
+
 - `ConversationNotFoundError` — conversation inexistante
 - `NotConversationMemberError` — l'utilisateur n'est pas membre
 - `AlreadyConversationMemberError` — déjà membre
 - `CannotAddMemberError` — ne peut pas ajouter (ex: seul le créateur peut inviter, ou tout membre peut inviter — choisis une règle et tiens-toi y)
 
 **Membership Policy** :
+
 ```
 canAccessConversation(conversationId, userId, memberRepo):
   → vérifie que le userId est dans conversation_members pour cette conversation
@@ -154,6 +158,7 @@ Cette policy est appelée dans CHAQUE handler qui touche à une conversation (le
 #### B.5 — Application (Commands)
 
 **CreateConversationCommand** :
+
 ```
 Input: { createdBy, title?, memberIds[] }
 1. Créer la conversation
@@ -163,6 +168,7 @@ Input: { createdBy, title?, memberIds[] }
 ```
 
 **AddConversationMemberCommand** :
+
 ```
 Input: { conversationId, requesterId, userId }
 1. Vérifier que la conversation existe
@@ -172,6 +178,7 @@ Input: { conversationId, requesterId, userId }
 ```
 
 **SendMessageCommand** :
+
 ```
 Input: { conversationId, senderId, content }
 1. Vérifier que la conversation existe
@@ -183,12 +190,14 @@ Input: { conversationId, senderId, content }
 #### B.6 — Application (Queries)
 
 **ListMyConversationsQuery** :
+
 ```
 Input: { userId }
 → Retourne toutes les conversations où userId est membre
 ```
 
 **GetConversationByIdQuery** :
+
 ```
 Input: { conversationId, requesterId }
 1. Vérifier que requesterId est membre
@@ -196,6 +205,7 @@ Input: { conversationId, requesterId }
 ```
 
 **ListMessagesQuery** :
+
 ```
 Input: { conversationId, requesterId, page, limit }
 1. Vérifier que requesterId est membre
@@ -226,14 +236,14 @@ Chaque adapter implémente son port avec des requêtes Drizzle. Pas de logique m
 
 #### B.9 — Interface HTTP (Controller)
 
-| Route                                        | Méthode | Auth | Description                     |
-|----------------------------------------------|---------|------|---------------------------------|
-| `POST /chat/conversations`                   | Command | JWT  | Créer une conversation          |
-| `GET /chat/conversations`                    | Query   | JWT  | Mes conversations               |
-| `GET /chat/conversations/:id`                | Query   | JWT  | Détail (membership vérifiée)    |
-| `POST /chat/conversations/:id/members`       | Command | JWT  | Ajouter un membre               |
-| `GET /chat/conversations/:id/messages`       | Query   | JWT  | Messages paginés                |
-| `POST /chat/conversations/:id/messages`      | Command | JWT  | Envoyer un message              |
+| Route                                   | Méthode | Auth | Description                  |
+| --------------------------------------- | ------- | ---- | ---------------------------- |
+| `POST /chat/conversations`              | Command | JWT  | Créer une conversation       |
+| `GET /chat/conversations`               | Query   | JWT  | Mes conversations            |
+| `GET /chat/conversations/:id`           | Query   | JWT  | Détail (membership vérifiée) |
+| `POST /chat/conversations/:id/members`  | Command | JWT  | Ajouter un membre            |
+| `GET /chat/conversations/:id/messages`  | Query   | JWT  | Messages paginés             |
+| `POST /chat/conversations/:id/messages` | Command | JWT  | Envoyer un message           |
 
 Tous les endpoints chat nécessitent `@UseGuards(JwtAuthGuard)`.
 
@@ -247,6 +257,7 @@ Tous les endpoints chat nécessitent `@UseGuards(JwtAuthGuard)`.
 - Exporter les ports si nécessaire
 
 Enregistrer dans `app.module.ts` :
+
 ```
 imports: [..., ChatModule]
 ```
@@ -272,6 +283,7 @@ pnpm add @nestjs/websockets @nestjs/platform-socket.io socket.io
 #### C.2 — Principe fondamental
 
 Le **WebSocket Gateway est un simple transport**. Il ne fait que :
+
 1. Authentifier la connexion (JWT au handshake)
 2. Joindre des rooms (une room par conversation)
 3. Recevoir des events et les transformer en **Commands CQRS**
@@ -293,6 +305,7 @@ src/arch/modules/chat/interface/ws/
 Ce guard n'est **pas** un guard NestJS standard (il ne peut pas utiliser `APP_GUARD`). Il fonctionne au niveau du **handshake** Socket.IO.
 
 **Logique** :
+
 ```
 1. Extraire le token du handshake : client.handshake.auth.token
 2. Vérifier le JWT (même secret que l'access token)
@@ -301,6 +314,7 @@ Ce guard n'est **pas** un guard NestJS standard (il ne peut pas utiliser `APP_GU
 ```
 
 **Implémentation** : Dans le gateway, utiliser le lifecycle hook `handleConnection` :
+
 ```
 handleConnection(client: Socket):
   try:
@@ -318,7 +332,7 @@ handleConnection(client: Socket):
 **Events** :
 
 | Event          | Direction       | Description                                        |
-|----------------|-----------------|----------------------------------------------------|
+| -------------- | --------------- | -------------------------------------------------- |
 | `connection`   | Client → Server | Handshake + auth JWT                               |
 | `join_room`    | Client → Server | Rejoindre une room (conversationId)                |
 | `send_message` | Client → Server | Envoyer un message (via CQRS)                      |
@@ -326,6 +340,7 @@ handleConnection(client: Socket):
 | `disconnect`   | Client → Server | Déconnexion                                        |
 
 **Flow `send_message`** :
+
 ```
 1. Client envoie : { conversationId, content }
 2. Gateway extrait le userId depuis socket.data.user
@@ -338,6 +353,7 @@ handleConnection(client: Socket):
 ```
 
 **Flow `join_room`** :
+
 ```
 1. Client envoie : { conversationId }
 2. Gateway vérifie que l'utilisateur est membre (via un query)
@@ -356,6 +372,7 @@ pnpm add @socket.io/redis-adapter
 ```
 
 Configuration dans le module :
+
 ```
 IoAdapter avec Redis → les events sont broadcastés via Redis pub/sub
 ```
@@ -378,6 +395,7 @@ try {
 #### C.8 — Mettre à jour `chat.module.ts`
 
 Ajouter le gateway aux providers :
+
 ```
 providers: [...handlers, ..., ChatGateway]
 ```
@@ -385,6 +403,7 @@ providers: [...handlers, ..., ChatGateway]
 #### C.9 — Mettre à jour le GlobalExceptionFilter
 
 Ajouter le mapping dans le filter pour les erreurs chat :
+
 - `ConversationNotFoundError` → 404
 - `NotConversationMemberError` → 403
 - `CannotAddMemberError` → 403
@@ -395,7 +414,7 @@ Ajouter le mapping dans le filter pour les erreurs chat :
 ## Où mettre quoi dans /arch
 
 | Élément                        | Couche         | Emplacement                                        |
-|--------------------------------|----------------|----------------------------------------------------|
+| ------------------------------ | -------------- | -------------------------------------------------- |
 | Models (conversation, message) | Domain         | `modules/chat/domain/models/`                      |
 | Errors (not member, etc.)      | Domain         | `modules/chat/domain/errors/`                      |
 | Membership policy              | Domain         | `modules/chat/domain/services/`                    |
@@ -416,6 +435,7 @@ Ajouter le mapping dans le filter pour les erreurs chat :
 Pas de nouvelles variables spécifiques au chat. Le WebSocket utilise le même port que HTTP (Socket.IO est attaché au même serveur HTTP).
 
 Si tu veux configurer le Redis adapter pour le scaling :
+
 ```env
 # Redis (déjà présent pour le rate limiting)
 REDIS_URL=redis://localhost:6379
@@ -425,28 +445,30 @@ REDIS_URL=redis://localhost:6379
 
 ## Pièges à éviter
 
-| Piège | Pourquoi | Solution |
-|-------|----------|----------|
-| Mettre la logique métier dans le gateway | Le gateway est un transport, pas un service métier | Tout passe par `commandBus.execute()` |
-| Oublier la membership policy | N'importe qui peut lire les messages d'une conversation | Vérifier la membership dans CHAQUE handler (read et write) |
-| Vérifier la membership dans le controller/gateway | Logique métier dans l'Interface | La membership est vérifiée dans le handler CQRS |
-| Créer le dossier `ws/` avant la Phase C | Dossier vide → bruit | Ne créer que quand tu en as besoin |
-| WebSocket sans auth | Tout le monde peut écouter les conversations | Auth JWT au handshake, déconnexion si invalide |
-| Ne pas joindre les rooms | Les messages sont broadcastés à TOUT le monde | `client.join(conversationId)` après vérification de membership |
-| Oublier de gérer les erreurs dans le gateway | Les erreurs partent dans le void | Try/catch + `client.emit('error', ...)` |
-| Scaling sans Redis adapter | Les messages ne sont pas partagés entre instances | Ajouter `@socket.io/redis-adapter` en production |
-| Ne pas tester le chat HTTP avant d'ajouter le WS | Tu ne sais pas si les handlers CQRS marchent | Phase B entièrement testée → Phase C |
-| Créer des endpoints REST ET WebSocket redondants | Double la surface d'API pour rien | REST pour le CRUD (lister conversations, historique), WS pour le temps réel (envoyer/recevoir en live) |
+| Piège                                             | Pourquoi                                                | Solution                                                                                               |
+| ------------------------------------------------- | ------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| Mettre la logique métier dans le gateway          | Le gateway est un transport, pas un service métier      | Tout passe par `commandBus.execute()`                                                                  |
+| Oublier la membership policy                      | N'importe qui peut lire les messages d'une conversation | Vérifier la membership dans CHAQUE handler (read et write)                                             |
+| Vérifier la membership dans le controller/gateway | Logique métier dans l'Interface                         | La membership est vérifiée dans le handler CQRS                                                        |
+| Créer le dossier `ws/` avant la Phase C           | Dossier vide → bruit                                    | Ne créer que quand tu en as besoin                                                                     |
+| WebSocket sans auth                               | Tout le monde peut écouter les conversations            | Auth JWT au handshake, déconnexion si invalide                                                         |
+| Ne pas joindre les rooms                          | Les messages sont broadcastés à TOUT le monde           | `client.join(conversationId)` après vérification de membership                                         |
+| Oublier de gérer les erreurs dans le gateway      | Les erreurs partent dans le void                        | Try/catch + `client.emit('error', ...)`                                                                |
+| Scaling sans Redis adapter                        | Les messages ne sont pas partagés entre instances       | Ajouter `@socket.io/redis-adapter` en production                                                       |
+| Ne pas tester le chat HTTP avant d'ajouter le WS  | Tu ne sais pas si les handlers CQRS marchent            | Phase B entièrement testée → Phase C                                                                   |
+| Créer des endpoints REST ET WebSocket redondants  | Double la surface d'API pour rien                       | REST pour le CRUD (lister conversations, historique), WS pour le temps réel (envoyer/recevoir en live) |
 
 ---
 
 ## Checklist DONE
 
 ### Phase A — HTTP Clean
+
 - [ ] Auth, posts, rate limiting, Swagger → tout OK (cf. Concept 5)
 - [ ] `pnpm build` compile
 
 ### Phase B — Chat HTTP
+
 - [ ] Tables `conversations`, `conversation_members`, `messages` créées
 - [ ] Seed insère une conversation avec messages
 - [ ] `POST /chat/conversations` crée une conversation
@@ -461,6 +483,7 @@ REDIS_URL=redis://localhost:6379
 - [ ] `pnpm build` compile
 
 ### Phase C — Chat WebSocket
+
 - [ ] Gateway sur `/chat` namespace
 - [ ] Auth JWT au handshake (déconnexion si invalide)
 - [ ] `join_room` rejoint une room conversation
@@ -543,7 +566,7 @@ Pour tester le WebSocket, plusieurs options :
 const { io } = require('socket.io-client');
 
 const socket = io('http://localhost:3000/chat', {
-  auth: { token: '<ACCESS_TOKEN>' }
+  auth: { token: '<ACCESS_TOKEN>' },
 });
 
 socket.on('connect', () => {
@@ -555,7 +578,7 @@ socket.on('connect', () => {
   // Envoyer un message
   socket.emit('send_message', {
     conversationId: '<CONV_UUID>',
-    content: 'Hello depuis WebSocket !'
+    content: 'Hello depuis WebSocket !',
   });
 });
 
@@ -585,7 +608,7 @@ node test-ws.js
 
 ```javascript
 const socket = io('http://localhost:3000/chat', {
-  auth: { token: 'token-invalide' }
+  auth: { token: 'token-invalide' },
 });
 
 socket.on('connect_error', (error) => {

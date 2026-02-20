@@ -41,6 +41,7 @@ Le modèle est simple : **pas de rôles, pas de table en DB**. Les permissions s
 ```
 
 **Pourquoi pas de rôles ?** :
+
 - Le projet est éducatif, on garde les choses simples
 - Un système resource/action est plus granulaire qu'un rôle
 - Pas besoin de table `roles` ni de relation `users_roles`
@@ -64,10 +65,12 @@ C'est ce type qui est injecté dans `request.user` après validation du JWT par 
 **Emplacement** : `src/arch/common/interface/http/decorators/can.decorator.ts`
 
 Ce décorateur :
+
 1. Utilise `SetMetadata` pour stocker `{ resource, action }` sur le handler
 2. Est lu par le `PermissionsGuard`
 
 **Utilisation** :
+
 ```
 @Can('posts', 'create')   // Le user doit avoir posts.create
 @Can('user', 'update')    // Le user doit avoir user.update
@@ -94,6 +97,7 @@ Ce décorateur :
 **Cas spécial OptionalAuth** : Si le guard `OptionalAuthGuard` a posé un flag (ex : `req.isOptionalAuth = true`) et qu'il n'y a pas de `@Can()`, on laisse passer même sans user.
 
 **Enregistrement** : Guard global dans `app.module.ts` :
+
 ```
 { provide: APP_GUARD, useClass: PermissionsGuard }
 ```
@@ -112,6 +116,7 @@ handleRequest(err, user, info):
 ```
 
 **Cas d'usage concrets** :
+
 - `GET /posts` → anonyme voit les posts publics, connecté voit aussi ses privés
 - `GET /posts/:id` → anonyme voit un post public, connecté voit aussi ses posts privés
 - `GET /users/:id` → profil public, mais si le :id correspond au user connecté, on pourrait enrichir
@@ -121,15 +126,18 @@ handleRequest(err, user, info):
 Le JWT access token a un TTL de 15 minutes (`JWT_ACCESS_EXPIRATION=15m`).
 
 **Côté génération** (dans `JwtTokenAdapter`) :
+
 ```
 jwt.sign(payload, secret, { expiresIn: '15m' })
 ```
 
 **Côté validation** (dans `JwtStrategy` / Passport) :
+
 - Passport vérifie automatiquement le `exp` du JWT
 - Si expiré → `TokenExpiredError` → attrapé par le `GlobalExceptionFilter` → **401 Unauthorized**
 
 **Réponse 401 pour token expiré** :
+
 ```json
 {
   "statusCode": 401,
@@ -148,6 +156,7 @@ jwt.sign(payload, secret, { expiresIn: '15m' })
 Le refresh token est géré via une **table `sessions`** en PostgreSQL.
 
 **Flow du refresh** :
+
 ```
 Client envoie : POST /auth/refresh { refreshToken }
   ↓
@@ -173,6 +182,7 @@ Client envoie : POST /auth/refresh { refreshToken }
 ### Étape 8 — Logout et Change Password
 
 **Logout** (`POST /auth/logout`) :
+
 ```
 1. Extraire le sessionId du JWT access token (ou du body)
 2. Révoquer la session : UPDATE sessions SET revokedAt = NOW() WHERE id = sessionId
@@ -180,6 +190,7 @@ Client envoie : POST /auth/refresh { refreshToken }
 ```
 
 **Change Password** (`POST /auth/change-password`) :
+
 ```
 1. Vérifier l'ancien mot de passe
 2. Hasher le nouveau mot de passe
@@ -241,20 +252,20 @@ JWT_REFRESH_EXPIRATION=7d
 
 ## Où mettre quoi dans /arch
 
-| Élément                    | Couche         | Emplacement                                           |
-|----------------------------|----------------|-------------------------------------------------------|
-| `UserPrincipal` type       | Shared         | `shared/types/user-principal.type.ts`                 |
-| `@Can()` decorator         | Interface      | `common/interface/http/decorators/can.decorator.ts`   |
-| `PermissionsGuard`         | Interface      | `common/interface/http/guards/permissions.guard.ts`   |
-| `OptionalAuthGuard`        | Interface      | `common/interface/http/guards/optional-auth.guard.ts` |
-| `JwtAuthGuard`             | Interface      | Module auth : `interface/http/guards/`                |
-| `JwtStrategy`              | Interface      | Module auth : `interface/http/strategies/`            |
-| Token generation/validation| Infrastructure | Module auth : `infrastructure/adapters/jwt-token.adapter.ts` |
-| Session repository         | Infrastructure | Module auth : `infrastructure/adapters/session-repository.adapter.ts` |
-| Session vérifications      | Application    | Module auth : `application/commands/refresh-token.handler.ts` |
-| Post visibility policy     | Domain         | Module posts : `domain/services/post-visibility.policy.ts` |
-| Post ownership policy      | Domain         | Module posts : `domain/services/post-visibility.policy.ts` |
-| Domain errors              | Domain         | `domain/errors/` dans chaque module                   |
+| Élément                     | Couche         | Emplacement                                                           |
+| --------------------------- | -------------- | --------------------------------------------------------------------- |
+| `UserPrincipal` type        | Shared         | `shared/types/user-principal.type.ts`                                 |
+| `@Can()` decorator          | Interface      | `common/interface/http/decorators/can.decorator.ts`                   |
+| `PermissionsGuard`          | Interface      | `common/interface/http/guards/permissions.guard.ts`                   |
+| `OptionalAuthGuard`         | Interface      | `common/interface/http/guards/optional-auth.guard.ts`                 |
+| `JwtAuthGuard`              | Interface      | Module auth : `interface/http/guards/`                                |
+| `JwtStrategy`               | Interface      | Module auth : `interface/http/strategies/`                            |
+| Token generation/validation | Infrastructure | Module auth : `infrastructure/adapters/jwt-token.adapter.ts`          |
+| Session repository          | Infrastructure | Module auth : `infrastructure/adapters/session-repository.adapter.ts` |
+| Session vérifications       | Application    | Module auth : `application/commands/refresh-token.handler.ts`         |
+| Post visibility policy      | Domain         | Module posts : `domain/services/post-visibility.policy.ts`            |
+| Post ownership policy       | Domain         | Module posts : `domain/services/post-visibility.policy.ts`            |
+| Domain errors               | Domain         | `domain/errors/` dans chaque module                                   |
 
 ---
 
@@ -273,24 +284,25 @@ JWT_REFRESH_EXPIRATION=7d
 
 ## Pièges à éviter
 
-| Piège | Pourquoi | Solution |
-|-------|----------|----------|
-| Stocker les permissions dans une table DB et les lire dans le guard | Appel DB à chaque requête protégée → lent | Permissions dans le JWT payload, le guard ne lit que `req.user` |
-| Oublier `@UseGuards(JwtAuthGuard)` quand tu mets `@Can()` | Le PermissionsGuard n'a pas de user → crash ou 401 inattendu | Toujours combiner les deux |
-| Vérifier l'ownership dans le controller | Logique métier dans l'Interface → pas testable, pas réutilisable | Ownership vérifié dans le handler CQRS qui appelle la policy Domain |
-| Ne pas révoquer les sessions au change-password | L'attaquant qui a volé un refresh token peut encore l'utiliser | `revokeAllByUserId()` obligatoire |
-| Ne pas hasher le refresh token en DB | Si la DB fuit, tous les refresh tokens sont compromis | Toujours stocker uniquement le hash |
-| Oublier de vérifier `revokedAt` dans le refresh flow | Un token révoqué (après logout) fonctionne encore | Vérifier les 4 conditions : existe, non révoqué, non expiré, hash OK |
-| Token expiré = 403 au lieu de 401 | 403 = "tu n'as pas la permission" (authentifié mais pas autorisé). 401 = "tu n'es pas authentifié" | Token expiré/invalide → 401. Permission refusée → 403 |
-| OptionalAuthGuard qui lève sur token expiré | L'utilisateur anonyme ne peut plus accéder aux routes publiques si un cookie expiré traîne | Catch l'erreur, retourner null |
-| Mettre le clock skew à 5 minutes | Un token "expiré" reste valide trop longtemps | 30 secondes max de tolérance |
-| Oublier de retourner le message "utilisez /auth/refresh" sur 401 | Le client ne sait pas quoi faire | Message explicite dans la réponse 401 |
+| Piège                                                               | Pourquoi                                                                                           | Solution                                                             |
+| ------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------- |
+| Stocker les permissions dans une table DB et les lire dans le guard | Appel DB à chaque requête protégée → lent                                                          | Permissions dans le JWT payload, le guard ne lit que `req.user`      |
+| Oublier `@UseGuards(JwtAuthGuard)` quand tu mets `@Can()`           | Le PermissionsGuard n'a pas de user → crash ou 401 inattendu                                       | Toujours combiner les deux                                           |
+| Vérifier l'ownership dans le controller                             | Logique métier dans l'Interface → pas testable, pas réutilisable                                   | Ownership vérifié dans le handler CQRS qui appelle la policy Domain  |
+| Ne pas révoquer les sessions au change-password                     | L'attaquant qui a volé un refresh token peut encore l'utiliser                                     | `revokeAllByUserId()` obligatoire                                    |
+| Ne pas hasher le refresh token en DB                                | Si la DB fuit, tous les refresh tokens sont compromis                                              | Toujours stocker uniquement le hash                                  |
+| Oublier de vérifier `revokedAt` dans le refresh flow                | Un token révoqué (après logout) fonctionne encore                                                  | Vérifier les 4 conditions : existe, non révoqué, non expiré, hash OK |
+| Token expiré = 403 au lieu de 401                                   | 403 = "tu n'as pas la permission" (authentifié mais pas autorisé). 401 = "tu n'es pas authentifié" | Token expiré/invalide → 401. Permission refusée → 403                |
+| OptionalAuthGuard qui lève sur token expiré                         | L'utilisateur anonyme ne peut plus accéder aux routes publiques si un cookie expiré traîne         | Catch l'erreur, retourner null                                       |
+| Mettre le clock skew à 5 minutes                                    | Un token "expiré" reste valide trop longtemps                                                      | 30 secondes max de tolérance                                         |
+| Oublier de retourner le message "utilisez /auth/refresh" sur 401    | Le client ne sait pas quoi faire                                                                   | Message explicite dans la réponse 401                                |
 
 ---
 
 ## Checklist DONE
 
 ### Authorization
+
 - [ ] `@Can(resource, action)` existe et est utilisé sur au moins 3 endpoints
 - [ ] `PermissionsGuard` est enregistré globalement
 - [ ] Un endpoint avec `@Can('posts', 'create')` retourne 403 si la permission manque
@@ -301,12 +313,14 @@ JWT_REFRESH_EXPIRATION=7d
 - [ ] `GET /posts` authentifié → posts publics + posts privés du user
 
 ### Expiration Access Token
+
 - [ ] Le JWT access token expire après 15 minutes
 - [ ] Une requête avec un token expiré retourne 401 (pas 403)
 - [ ] Le message 401 indique clairement "token expiré" et suggère `/auth/refresh`
 - [ ] Le `GlobalExceptionFilter` mappe `TokenExpiredError` → 401
 
 ### Refresh Token et Sessions
+
 - [ ] `POST /auth/refresh` avec un refresh token valide retourne de nouveaux tokens
 - [ ] L'ancien refresh token ne fonctionne plus après rotation (session révoquée)
 - [ ] Un refresh token expiré (>7 jours) retourne 401
@@ -314,17 +328,20 @@ JWT_REFRESH_EXPIRATION=7d
 - [ ] Le hash du refresh token est vérifié (pas de comparaison en clair)
 
 ### Logout et Change Password
+
 - [ ] `POST /auth/logout` révoque la session → refresh impossible
 - [ ] `POST /auth/change-password` révoque TOUTES les sessions
 - [ ] Après change-password, aucun ancien refresh token ne fonctionne
 
 ### Policies
+
 - [ ] La policy de visibilité est dans Domain (`post-visibility.policy.ts`)
 - [ ] `GET /posts/:id` pour un post privé par un non-owner → 403
 - [ ] `PATCH /posts/:id` par un non-owner → 403
 - [ ] `DELETE /posts/:id` par un non-owner → 403
 
 ### Documentation
+
 - [ ] Swagger documente les 401/403 sur chaque endpoint protégé
 - [ ] `.env.example` contient toutes les variables JWT
 

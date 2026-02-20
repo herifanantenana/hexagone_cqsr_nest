@@ -70,11 +70,11 @@ ThrottlerModule.forRootAsync({
 
 **Explication des 3 throttlers** :
 
-| Nom      | Limite/min | S'applique à                   |
-|----------|-----------|--------------------------------|
-| `global` | 120       | Toute requête (par défaut)     |
-| `auth`   | 5         | Login, signup, refresh (opt-in)|
-| `upload` | 10        | Upload avatar (opt-in)         |
+| Nom      | Limite/min | S'applique à                    |
+| -------- | ---------- | ------------------------------- |
+| `global` | 120        | Toute requête (par défaut)      |
+| `auth`   | 5          | Login, signup, refresh (opt-in) |
+| `upload` | 10         | Upload avatar (opt-in)          |
 
 `global` s'applique à tout. `auth` et `upload` sont **opt-in** : ils ne s'activent que si tu mets un décorateur sur le endpoint.
 
@@ -118,13 +118,13 @@ Dans `app.module.ts`, ajouter aux providers :
 
 ### Étape 7 — Appliquer les décorateurs
 
-| Endpoint                    | Décorateur        |
-|-----------------------------|-------------------|
-| `POST /auth/signup`         | `@AuthThrottle()` |
-| `POST /auth/login`          | `@AuthThrottle()` |
-| `POST /auth/refresh`        | `@AuthThrottle()` |
-| `POST /users/me/avatar`     | `@UploadThrottle()` |
-| `GET /health`               | `@SkipThrottle()` |
+| Endpoint                | Décorateur          |
+| ----------------------- | ------------------- |
+| `POST /auth/signup`     | `@AuthThrottle()`   |
+| `POST /auth/login`      | `@AuthThrottle()`   |
+| `POST /auth/refresh`    | `@AuthThrottle()`   |
+| `POST /users/me/avatar` | `@UploadThrottle()` |
+| `GET /health`           | `@SkipThrottle()`   |
 
 ### Étape 8 — Réponse 429 propre
 
@@ -147,6 +147,7 @@ ThrottlerException → 429 Too Many Requests
 Si l'app est derrière un reverse proxy (Nginx, Cloudflare, etc.) :
 
 1. Dans `main.ts` :
+
    ```
    if (configService.get('TRUST_PROXY') === 'true') {
      app.getHttpAdapter().getInstance().set('trust proxy', 1);
@@ -161,15 +162,15 @@ Si l'app est derrière un reverse proxy (Nginx, Cloudflare, etc.) :
 
 ## Où mettre quoi dans /arch
 
-| Fichier / Module                        | Couche         | Emplacement                                       |
-|-----------------------------------------|----------------|---------------------------------------------------|
-| Module Redis (`@Global`)                | Infrastructure | `common/infra/redis/`                             |
-| Redis config                            | Infrastructure | `common/infra/redis/redis.config.ts`              |
-| Redis client provider                   | Infrastructure | `common/infra/redis/redis.client.ts`              |
-| RateLimitGuard                          | Interface      | `common/interface/http/guards/rate-limit.guard.ts` |
-| Décorateurs `@AuthThrottle`, `@UploadThrottle` | Interface | `common/interface/http/decorators/rate-limit.decorators.ts` |
-| Constantes throttle                     | Interface      | `common/interface/http/constants/rate-limit.constants.ts` |
-| Config ThrottlerModule                  | Interface      | `app.module.ts` (imports)                         |
+| Fichier / Module                               | Couche         | Emplacement                                                 |
+| ---------------------------------------------- | -------------- | ----------------------------------------------------------- |
+| Module Redis (`@Global`)                       | Infrastructure | `common/infra/redis/`                                       |
+| Redis config                                   | Infrastructure | `common/infra/redis/redis.config.ts`                        |
+| Redis client provider                          | Infrastructure | `common/infra/redis/redis.client.ts`                        |
+| RateLimitGuard                                 | Interface      | `common/interface/http/guards/rate-limit.guard.ts`          |
+| Décorateurs `@AuthThrottle`, `@UploadThrottle` | Interface      | `common/interface/http/decorators/rate-limit.decorators.ts` |
+| Constantes throttle                            | Interface      | `common/interface/http/constants/rate-limit.constants.ts`   |
+| Config ThrottlerModule                         | Interface      | `app.module.ts` (imports)                                   |
 
 **Rien ne va dans Domain ni Application.** Le rate limiting est un concern purement Infrastructure/Interface.
 
@@ -196,16 +197,16 @@ TRUST_PROXY=false
 
 ## Pièges à éviter
 
-| Piège | Pourquoi | Solution |
-|-------|----------|----------|
-| Stocker les compteurs en mémoire (default) | En multi-instance, chaque instance a ses propres compteurs → le rate limit est contourné | Utiliser `ThrottlerStorageRedisService` |
-| Coder un storage Redis maison | Bugs subtils (race conditions, TTL), maintenance | Utiliser `@nest-lab/throttler-storage-redis` |
-| Appliquer tous les throttlers partout | Login limité à 120/min au lieu de 5/min | Rendre `auth`/`upload` opt-in via metadata dans le guard custom |
-| Tracker par IP sans `trust proxy` derrière Nginx | Toutes les requêtes viennent de `127.0.0.1` → tout le monde partage le même compteur | Configurer `trust proxy` dans Express |
-| Mettre `TRUST_PROXY=true` sans proxy | Un attaquant peut spoofer son IP via `X-Forwarded-For` | Uniquement si tu es derrière un proxy de confiance |
-| Oublier `@SkipThrottle()` sur `/health` | Les health checks de monitoring consomment le rate limit | Exclure explicitement |
-| Mettre la logique rate limit dans Application | Le rate limiting est un concern d'infra, pas métier | Guard + décorateurs dans Interface, storage dans Infra |
-| Ne pas gérer la déconnexion Redis | Si Redis tombe, toutes les requêtes sont refusées ou crashent | Tester le comportement, éventuellement fail-open en dev |
+| Piège                                            | Pourquoi                                                                                 | Solution                                                        |
+| ------------------------------------------------ | ---------------------------------------------------------------------------------------- | --------------------------------------------------------------- |
+| Stocker les compteurs en mémoire (default)       | En multi-instance, chaque instance a ses propres compteurs → le rate limit est contourné | Utiliser `ThrottlerStorageRedisService`                         |
+| Coder un storage Redis maison                    | Bugs subtils (race conditions, TTL), maintenance                                         | Utiliser `@nest-lab/throttler-storage-redis`                    |
+| Appliquer tous les throttlers partout            | Login limité à 120/min au lieu de 5/min                                                  | Rendre `auth`/`upload` opt-in via metadata dans le guard custom |
+| Tracker par IP sans `trust proxy` derrière Nginx | Toutes les requêtes viennent de `127.0.0.1` → tout le monde partage le même compteur     | Configurer `trust proxy` dans Express                           |
+| Mettre `TRUST_PROXY=true` sans proxy             | Un attaquant peut spoofer son IP via `X-Forwarded-For`                                   | Uniquement si tu es derrière un proxy de confiance              |
+| Oublier `@SkipThrottle()` sur `/health`          | Les health checks de monitoring consomment le rate limit                                 | Exclure explicitement                                           |
+| Mettre la logique rate limit dans Application    | Le rate limiting est un concern d'infra, pas métier                                      | Guard + décorateurs dans Interface, storage dans Infra          |
+| Ne pas gérer la déconnexion Redis                | Si Redis tombe, toutes les requêtes sont refusées ou crashent                            | Tester le comportement, éventuellement fail-open en dev         |
 
 ---
 

@@ -32,6 +32,7 @@ pnpm add winston nest-winston
 ```
 
 Optionnel (rotation des fichiers) :
+
 ```bash
 pnpm add winston-daily-rotate-file
 ```
@@ -40,13 +41,13 @@ pnpm add winston-daily-rotate-file
 
 Winston utilise les niveaux npm par défaut (du plus grave au plus verbeux) :
 
-| Niveau | Valeur | Usage |
-|--------|--------|-------|
-| `error` | 0 | Erreurs non récupérables, exceptions 5xx |
-| `warn` | 1 | Situations suspectes, erreurs 4xx (client) |
-| `info` | 2 | Événements importants (démarrage, login, création de ressource) |
-| `http` | 3 | Requêtes HTTP entrantes/sortantes |
-| `debug` | 4 | Détails techniques pour le dev |
+| Niveau  | Valeur | Usage                                                           |
+| ------- | ------ | --------------------------------------------------------------- |
+| `error` | 0      | Erreurs non récupérables, exceptions 5xx                        |
+| `warn`  | 1      | Situations suspectes, erreurs 4xx (client)                      |
+| `info`  | 2      | Événements importants (démarrage, login, création de ressource) |
+| `http`  | 3      | Requêtes HTTP entrantes/sortantes                               |
+| `debug` | 4      | Détails techniques pour le dev                                  |
 
 Le paramètre `LOG_LEVEL` définit le niveau **minimum**. Par exemple, `LOG_LEVEL=http` logge tout sauf `debug`.
 
@@ -66,15 +67,15 @@ src/arch/common/infra/logger/
 
 Lit les variables d'environnement via `ConfigService` :
 
-| Variable        | Défaut       | Description                                |
-|-----------------|--------------|--------------------------------------------|
-| `LOG_LEVEL`     | `http`       | Niveau minimum (error, warn, info, http, debug) |
-| `LOG_DIR`       | `logs`       | Dossier de sortie des fichiers             |
-| `LOG_CONSOLE`   | `true`       | Activer les logs en console                |
-| `LOG_FILE`      | `true` (prod)| Activer les logs en fichiers               |
-| `LOG_JSON_FILES`| `true` (prod)| Format JSON dans les fichiers (sinon texte)|
-| `LOG_ROTATE`    | `false`      | Activer la rotation quotidienne            |
-| `LOG_MAX_FILES` | `14d`        | Rétention des fichiers (jours ou nombre)   |
+| Variable         | Défaut        | Description                                     |
+| ---------------- | ------------- | ----------------------------------------------- |
+| `LOG_LEVEL`      | `http`        | Niveau minimum (error, warn, info, http, debug) |
+| `LOG_DIR`        | `logs`        | Dossier de sortie des fichiers                  |
+| `LOG_CONSOLE`    | `true`        | Activer les logs en console                     |
+| `LOG_FILE`       | `true` (prod) | Activer les logs en fichiers                    |
+| `LOG_JSON_FILES` | `true` (prod) | Format JSON dans les fichiers (sinon texte)     |
+| `LOG_ROTATE`     | `false`       | Activer la rotation quotidienne                 |
+| `LOG_MAX_FILES`  | `14d`         | Rétention des fichiers (jours ou nombre)        |
 
 **Règle** : En développement (`NODE_ENV=development`), active principalement la console. En production, active les fichiers avec rotation.
 
@@ -108,11 +109,13 @@ Créer la factory qui construit l'instance `winston.Logger` :
    - Logs HTTP séparés des logs applicatifs
 
 **Rotation optionnelle** (si `LOG_ROTATE=true` et `winston-daily-rotate-file` installé) :
+
 - Remplacement des transports File par des transports DailyRotateFile
 - Pattern : `logs/error-%DATE%.log`, etc.
 - `maxFiles: '14d'` (suppression automatique après 14 jours)
 
 **Création automatique du dossier `logs/`** :
+
 ```typescript
 import { mkdirSync, existsSync } from 'fs';
 if (!existsSync(logDir)) mkdirSync(logDir, { recursive: true });
@@ -140,6 +143,7 @@ class AppLogger {
 ```
 
 **`withContext()`** : Permet de créer une copie du logger avec un contexte nommé :
+
 ```typescript
 private readonly logger = this.appLogger.withContext('AuthService');
 this.logger.info('User logged in', { userId });
@@ -183,6 +187,7 @@ Le middleware doit attacher le `requestId` au contexte du logger pour que tous l
 **Comment** : Utiliser `cls-hooked`, `AsyncLocalStorage`, ou simplement attacher le requestId à `req` et le lire dans les interceptors/filters.
 
 L'approche la plus simple :
+
 1. Le middleware attache `req.requestId = uuid`
 2. Le `HttpLoggingInterceptor` lit `req.requestId` et le passe au logger
 3. Le `GlobalExceptionFilter` lit `req.requestId` et le passe au logger
@@ -192,6 +197,7 @@ L'approche la plus simple :
 Utiliser `AppLogger` (ou l'instance Winston directement) au lieu de `console.log` :
 
 **Incoming** :
+
 ```
 this.logger.http('Incoming request', {
   method: req.method,
@@ -204,6 +210,7 @@ this.logger.http('Incoming request', {
 ```
 
 **Outgoing** :
+
 ```
 const level = statusCode >= 500 ? 'error' : statusCode >= 400 ? 'warn' : 'info';
 
@@ -244,6 +251,7 @@ this.logger.warn('Client error', {
 Injecter `AppLogger` dans les services/handlers qui ont besoin de loguer :
 
 **Auth** :
+
 ```typescript
 // Dans le SignupHandler
 this.logger.info('New user registered', { email: command.email });
@@ -255,12 +263,14 @@ this.logger.info('User logged in', { userId });
 ```
 
 **Posts** :
+
 ```typescript
 this.logger.info('Post created', { postId, ownerId });
 this.logger.info('Post deleted', { postId, deletedBy });
 ```
 
 **Règle absolue : NE JAMAIS loguer** :
+
 - Mots de passe (en clair ou hashés)
 - Tokens (access, refresh)
 - Secrets JWT
@@ -269,6 +279,7 @@ this.logger.info('Post deleted', { postId, deletedBy });
 ### Étape 13 — `.gitignore`
 
 Ajouter :
+
 ```
 logs/
 ```
@@ -286,16 +297,16 @@ Le dossier `logs/` ne doit JAMAIS être commité. Il est créé automatiquement 
 
 ## Où mettre quoi dans /arch
 
-| Fichier                    | Couche         | Emplacement                                      |
-|----------------------------|----------------|--------------------------------------------------|
-| `logger.config.ts`         | Infrastructure | `common/infra/logger/`                           |
-| `winston.instance.ts`      | Infrastructure | `common/infra/logger/`                           |
-| `logger.service.ts`        | Infrastructure | `common/infra/logger/`                           |
-| `logger.module.ts`         | Infrastructure | `common/infra/logger/`                           |
-| `HttpLoggingInterceptor`   | Interface      | `common/interface/http/interceptors/`            |
-| `GlobalExceptionFilter`    | Interface      | `common/interface/http/filters/`                 |
-| `RequestIdMiddleware`      | Interface      | `common/interface/http/middleware/`               |
-| Logs applicatifs (dans handlers) | Application | `modules/<mod>/application/commands/` ou `queries/` |
+| Fichier                          | Couche         | Emplacement                                         |
+| -------------------------------- | -------------- | --------------------------------------------------- |
+| `logger.config.ts`               | Infrastructure | `common/infra/logger/`                              |
+| `winston.instance.ts`            | Infrastructure | `common/infra/logger/`                              |
+| `logger.service.ts`              | Infrastructure | `common/infra/logger/`                              |
+| `logger.module.ts`               | Infrastructure | `common/infra/logger/`                              |
+| `HttpLoggingInterceptor`         | Interface      | `common/interface/http/interceptors/`               |
+| `GlobalExceptionFilter`          | Interface      | `common/interface/http/filters/`                    |
+| `RequestIdMiddleware`            | Interface      | `common/interface/http/middleware/`                 |
+| Logs applicatifs (dans handlers) | Application    | `modules/<mod>/application/commands/` ou `queries/` |
 
 **Le logger est Infrastructure** (il dépend de Winston, une lib externe). Mais il est injecté partout via DI.
 
@@ -320,49 +331,52 @@ LOG_MAX_FILES=14d
 
 **Recommandations par environnement** :
 
-| Variable       | Development | Production |
-|----------------|-------------|------------|
-| `LOG_LEVEL`    | `debug`     | `http`     |
-| `LOG_CONSOLE`  | `true`      | `true`     |
-| `LOG_FILE`     | `false`     | `true`     |
-| `LOG_JSON_FILES`| `false`    | `true`     |
-| `LOG_ROTATE`   | `false`     | `true`     |
+| Variable         | Development | Production |
+| ---------------- | ----------- | ---------- |
+| `LOG_LEVEL`      | `debug`     | `http`     |
+| `LOG_CONSOLE`    | `true`      | `true`     |
+| `LOG_FILE`       | `false`     | `true`     |
+| `LOG_JSON_FILES` | `false`     | `true`     |
+| `LOG_ROTATE`     | `false`     | `true`     |
 
 ---
 
 ## Pièges à éviter
 
-| Piège | Pourquoi | Solution |
-|-------|----------|----------|
-| Garder `console.log` à côté de Winston | Logs non structurés, pas dans les fichiers | Remplacer TOUS les `console.log` par le logger Winston |
-| Loguer les mots de passe ou tokens | Fuite de données sensibles dans les fichiers de log | Règle stricte : jamais de secrets dans les logs |
-| Pas de requestId dans les logs | Impossible de corréler les logs d'une même requête | Toujours inclure le `requestId` dans les métadonnées |
-| Fichiers de log dans Git | Le repo grossit inutilement, données sensibles potentielles | `logs/` dans `.gitignore` |
-| Pas de rotation en production | Les fichiers grossissent indéfiniment → disque plein | Activer `LOG_ROTATE=true` avec une rétention (14 jours) |
-| Logger trop verbeux en production | Performances dégradées, disque plein | `LOG_LEVEL=info` ou `http` en production, `debug` en dev |
-| Winston non branché dans NestJS | Les logs NestJS natifs (DI errors, Passport errors) ne passent pas par Winston | `WinstonModule.createLogger()` dans `NestFactory.create()` |
-| Créer un "logger maison" au lieu de Winston | Réinvention de la roue, bugs, pas de rotation | Utiliser Winston qui est le standard Node.js |
-| Mettre le logger dans Domain | Domain ne doit pas dépendre de lib externes | Le logger est Infrastructure, injecté via DI dans Application |
-| Log level codé en dur | Pas de flexibilité entre environnements | Lire `LOG_LEVEL` depuis `.env` via `ConfigService` |
-| Stack trace dans la réponse HTTP | Information technique exposée au client | Stack trace dans le log uniquement, pas dans le body de la réponse |
+| Piège                                       | Pourquoi                                                                       | Solution                                                           |
+| ------------------------------------------- | ------------------------------------------------------------------------------ | ------------------------------------------------------------------ |
+| Garder `console.log` à côté de Winston      | Logs non structurés, pas dans les fichiers                                     | Remplacer TOUS les `console.log` par le logger Winston             |
+| Loguer les mots de passe ou tokens          | Fuite de données sensibles dans les fichiers de log                            | Règle stricte : jamais de secrets dans les logs                    |
+| Pas de requestId dans les logs              | Impossible de corréler les logs d'une même requête                             | Toujours inclure le `requestId` dans les métadonnées               |
+| Fichiers de log dans Git                    | Le repo grossit inutilement, données sensibles potentielles                    | `logs/` dans `.gitignore`                                          |
+| Pas de rotation en production               | Les fichiers grossissent indéfiniment → disque plein                           | Activer `LOG_ROTATE=true` avec une rétention (14 jours)            |
+| Logger trop verbeux en production           | Performances dégradées, disque plein                                           | `LOG_LEVEL=info` ou `http` en production, `debug` en dev           |
+| Winston non branché dans NestJS             | Les logs NestJS natifs (DI errors, Passport errors) ne passent pas par Winston | `WinstonModule.createLogger()` dans `NestFactory.create()`         |
+| Créer un "logger maison" au lieu de Winston | Réinvention de la roue, bugs, pas de rotation                                  | Utiliser Winston qui est le standard Node.js                       |
+| Mettre le logger dans Domain                | Domain ne doit pas dépendre de lib externes                                    | Le logger est Infrastructure, injecté via DI dans Application      |
+| Log level codé en dur                       | Pas de flexibilité entre environnements                                        | Lire `LOG_LEVEL` depuis `.env` via `ConfigService`                 |
+| Stack trace dans la réponse HTTP            | Information technique exposée au client                                        | Stack trace dans le log uniquement, pas dans le body de la réponse |
 
 ---
 
 ## Checklist DONE
 
 ### Installation et configuration
+
 - [ ] `winston` et `nest-winston` installés
 - [ ] `winston-daily-rotate-file` installé (optionnel)
 - [ ] Variables `LOG_*` dans `.env.example`
 - [ ] `logs/` dans `.gitignore`
 
 ### Fichiers créés
+
 - [ ] `logger.config.ts` lit les variables d'env
 - [ ] `winston.instance.ts` crée l'instance Winston avec les transports
 - [ ] `logger.service.ts` fournit `AppLogger` injectable
 - [ ] `logger.module.ts` est `@Global()`
 
 ### Branchement
+
 - [ ] `LoggerModule` importé dans `app.module.ts`
 - [ ] Winston remplace le logger NestJS natif dans `main.ts`
 - [ ] `HttpLoggingInterceptor` utilise Winston (pas `console.log`)
@@ -370,12 +384,14 @@ LOG_MAX_FILES=14d
 - [ ] `RequestIdMiddleware` attache le requestId lisible par le logger
 
 ### Console
+
 - [ ] `pnpm dev` → logs colorés en console
 - [ ] Les logs incluent : timestamp, niveau, contexte, message, requestId
 - [ ] Les requêtes HTTP sont loguées (incoming + outgoing)
 - [ ] Les erreurs sont loguées avec stack trace
 
 ### Fichiers de logs
+
 - [ ] `LOG_FILE=true` → crée `logs/error.log`, `logs/warn.log`, `logs/combined.log`, `logs/http.log`
 - [ ] Le dossier `logs/` est créé automatiquement
 - [ ] Les logs error contiennent uniquement les erreurs
@@ -383,15 +399,18 @@ LOG_MAX_FILES=14d
 - [ ] Le format est JSON en production (`LOG_JSON_FILES=true`)
 
 ### Rotation (optionnel)
+
 - [ ] `LOG_ROTATE=true` crée des fichiers avec date (`error-2024-01-15.log`)
 - [ ] Les fichiers de plus de `LOG_MAX_FILES` sont supprimés automatiquement
 
 ### Logs applicatifs
+
 - [ ] `AppLogger` injecté dans au moins un handler (auth, posts)
 - [ ] Les logs applicatifs incluent le contexte (`[AuthService]`, `[PostsService]`)
 - [ ] AUCUN mot de passe, token ou secret dans les logs
 
 ### Nettoyage
+
 - [ ] Plus aucun `console.log` dans le code
 - [ ] Pas de fichier de log commité dans Git
 - [ ] `pnpm build` compile sans erreur

@@ -45,11 +45,32 @@ function buildConsoleFormat(): winston.Logform.Format {
   );
 }
 
-// Format fichier : JSON structuré avec tous les champs
+// Format fichier JSON : structuré avec tous les champs (prod)
 function buildFileFormat(): winston.Logform.Format {
   return winston.format.combine(
     winston.format.timestamp(),
     winston.format.json(),
+  );
+}
+
+// Format fichier texte : lisible, sans couleurs (dev)
+// Exemple : "2026-02-20 10:30:45 [INFO] [Bootstrap] App running {port: 3000}"
+function buildFilePlainFormat(): winston.Logform.Format {
+  return winston.format.combine(
+    winston.format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
+    winston.format.printf(
+      ({ timestamp, level, message, context, requestId, ...meta }) => {
+        const ctx = context ? ` [${(context as string).toUpperCase()}]` : '';
+        const rid = requestId ? ` {requestId: ${requestId as string}}` : '';
+        // Exclure les champs déjà affichés pour éviter les doublons
+        const rest = meta as Record<string, unknown> & {
+          splat?: unknown;
+        };
+        const extra =
+          Object.keys(rest).length > 0 ? ` ${JSON.stringify(rest)}` : '';
+        return `${timestamp as string} [${level.toUpperCase()}]${ctx} ${message as string}${rid}${extra}`;
+      },
+    ),
   );
 }
 
@@ -65,7 +86,7 @@ function createRotateTransport(
     datePattern: 'YYYY-MM-DD',
     maxFiles: config.maxFiles,
     level,
-    format: config.jsonFiles ? buildFileFormat() : undefined,
+    format: config.jsonFiles ? buildFileFormat() : buildFilePlainFormat(),
   });
 }
 
@@ -79,7 +100,7 @@ function createFileTransport(
     dirname: config.dir,
     filename: `${filename}.log`,
     level,
-    format: config.jsonFiles ? buildFileFormat() : undefined,
+    format: config.jsonFiles ? buildFileFormat() : buildFilePlainFormat(),
   });
 }
 
@@ -123,11 +144,23 @@ export function createWinstonLogger(): winston.Logger {
     }
   }
 
+  // Filet de sécurité : si aucun transport n'a été configuré (mauvaise config env),
+  // on ajoute toujours une console pour éviter le warning
+  // "[winston] Attempt to write logs with no transports"
+  if (transports.length === 0) {
+    transports.push(
+      new winston.transports.Console({
+        format: buildConsoleFormat(),
+      }),
+    );
+  }
+
   return winston.createLogger({
     levels: customLevels.levels,
     level: config.level,
-    // Format par défaut pour les fichiers (JSON structuré)
-    format: buildFileFormat(),
+    // Pas de format racine : chaque transport gère son propre format
+    // (un format racine json() interférait avec le pipeline de streams Winston
+    // et pouvait déclencher le warning "no transports" même quand ils étaient présents)
     transports,
     // Ne pas crasher l'app si Winston a un problème interne
     exitOnError: false,

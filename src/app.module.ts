@@ -34,7 +34,9 @@ import { UserModule } from './arch/modules/user/user.module';
     // Charge .env par défaut (copier .env.example → .env avant de démarrer)
     ConfigModule.forRoot({
       isGlobal: true,
-      envFilePath: '.env.example',
+      // Charge .env en priorité (dev local), sinon .env.example comme fallback
+      // Ne jamais committer .env en production (secrets)
+      envFilePath: ['.env', '.env.dev', '.env.example'],
     }),
 
     // Logger Winston global (AppLogger injectable partout)

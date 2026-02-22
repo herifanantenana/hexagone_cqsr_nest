@@ -1,52 +1,42 @@
 // Bootstrap : configure le pipeline HTTP global
-// Ordre d'exécution par requête : Middleware → Guards → Interceptor(before) → Pipe → Handler → Interceptor(after) → Filter(si erreur)
+// Ordre d'execution par requete : Middleware → Guards → Interceptor(before) → Pipe → Handler → Interceptor(after) → Filter(si erreur)
 
 import { ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
-import { WinstonModule } from 'nest-winston';
 import { join } from 'path';
 import { AppModule } from './app.module';
-import { winstonInstance } from './arch/common/infra/logger';
+import { AppLogger } from './arch/common/infra/logger';
 
 async function bootstrap() {
+  // bufferLogs: true → NestJS stocke les logs de bootstrap en memoire
+  // app.flushLogs()  → les rejoue tous via Winston une fois le DI pret
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
-    // Remplace le logger NestJS natif par Winston
-    // Tous les logs internes de NestJS (lifecycle, routes, errors) passent par Winston
-    logger: WinstonModule.createLogger({ instance: winstonInstance }),
+    bufferLogs: true,
   });
 
-  // Trust proxy : indispensable derrière un reverse proxy (Nginx, Cloudflare…)
-  // Active req.ip avec la vraie IP client (x-forwarded-for)
+  const logger = app.get(AppLogger);
+  app.useLogger(logger);
+  app.flushLogs();
+
   if (process.env.TRUST_PROXY === 'true') {
     app.set('trust proxy', 1);
   }
 
-  // Global validation pipe : valide les DTOs via class-validator
-  // whitelist : supprime les propriétés non décorées du body
-  // forbidNonWhitelisted : rejette la requête si des propriétés inconnues sont envoyées
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
       forbidNonWhitelisted: true,
-      transform: true, // Active class-transformer (ex: @Type(() => Number) sur les query params)
+      transform: true,
     }),
   );
 
-  // GlobalExceptionFilter et HttpLoggingInterceptor sont branchés via APP_FILTER / APP_INTERCEPTOR
-  // dans app.module.ts (injection DI nécessaire pour AppLogger)
-
-  // Serve static files (avatars uploadés dans ./uploads)
   app.useStaticAssets(join(process.cwd(), 'uploads'), { prefix: '/uploads' });
-
-  app.enableCors(); // Autorise toutes les origines (à restreindre en production)
-
-  // Active les hooks de shutdown pour fermer proprement les connexions (Redis, DB)
+  app.enableCors();
   app.enableShutdownHooks();
 
-  // ─── Swagger (OpenAPI) ─────────────────────────────────────────────────
-  // Documentation interactive accessible sur /api/docs
+  // Swagger (OpenAPI) sur /api/docs
   const swaggerConfig = new DocumentBuilder()
     .setTitle('Hexagonal CQRS API')
     .setDescription(
@@ -71,17 +61,18 @@ async function bootstrap() {
     .build();
 
   const document = SwaggerModule.createDocument(app, swaggerConfig);
-  SwaggerModule.setup('api/docs', app, document); // UI Swagger sur /api/docs
+  SwaggerModule.setup('api/docs', app, document);
 
   const port = process.env.PORT || 3000;
   await app.listen(port);
 
-  winstonInstance.info(`Application is running on: http://localhost:${port}`, {
-    context: 'Bootstrap',
-  });
-  winstonInstance.info(
+  logger.log(
+    `Application is running on: http://localhost:${port}`,
+    'Bootstrap',
+  );
+  logger.log(
     `Swagger docs available at: http://localhost:${port}/api/docs`,
-    { context: 'Bootstrap' },
+    'Bootstrap',
   );
 }
 void bootstrap();

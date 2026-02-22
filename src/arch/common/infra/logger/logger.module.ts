@@ -1,28 +1,12 @@
-// Module global qui fournit Winston + AppLogger à toute l'application
-// @Global : pas besoin d'importer LoggerModule dans chaque module
+// Module global : fournit Winston + AppLogger a toute l'application
+// @Global : injectable partout sans re-importer LoggerModule
 
 import { Global, Module } from '@nestjs/common';
-import { config as dotenvLoad } from 'dotenv';
-import { existsSync } from 'fs';
+import { ConfigService } from '@nestjs/config';
 import { WINSTON_MODULE_PROVIDER } from 'nest-winston';
-import { resolve } from 'path';
+import { loadLoggerConfig } from './logger.config';
 import { AppLogger } from './logger.service';
 import { createWinstonLogger } from './winston.instance';
-
-// ─── Timing fix ──────────────────────────────────────────────────────────────
-// Ce module est importé (et évalué) AVANT que NestJS/ConfigModule ait eu le
-// temps de charger le fichier .env via dotenv. Sans ce bloc, createWinstonLogger()
-// lit process.env avec uniquement les variables système (pas celles du .env).
-// → On charge les fichiers .env ici, en ordre décroissant de priorité,
-//   avec override: false pour ne jamais écraser les variables déjà définies
-//   (système ou chargées par un fichier de priorité supérieure).
-for (const file of ['.env', '.env.dev', '.env.example']) {
-  const p = resolve(process.cwd(), file);
-  if (existsSync(p)) dotenvLoad({ path: p, override: false });
-}
-
-// Instance Winston partagée entre le module NestJS et le bootstrap (main.ts)
-export const winstonInstance = createWinstonLogger();
 
 @Global()
 @Module({
@@ -34,10 +18,17 @@ export const winstonInstance = createWinstonLogger();
   providers: [
     {
       provide: WINSTON_MODULE_PROVIDER,
-      useValue: winstonInstance,
+      inject: [ConfigService],
+      useFactory: (configService: ConfigService) => {
+        const config = loadLoggerConfig(configService);
+        const instance = createWinstonLogger(config);
+        // Rend l'instance accessible pour AppLogger.create() (hors DI)
+        AppLogger.setInstance(instance);
+        return instance;
+      },
     },
     AppLogger,
   ],
-  exports: [WINSTON_MODULE_PROVIDER, AppLogger],
+  exports: [AppLogger],
 })
 export class LoggerModule {}

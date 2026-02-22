@@ -36,10 +36,10 @@ import { UserModule } from './arch/modules/user/user.module';
       isGlobal: true,
       // Charge .env en priorité (dev local), sinon .env.example comme fallback
       // Ne jamais committer .env en production (secrets)
-      envFilePath: ['.env', '.env.dev', '.env.example'],
+      envFilePath: ['.env', '.env.development', '.env.example'],
     }),
 
-    // Logger Winston global (AppLogger injectable partout)
+    // Logger Winston global (AppLogger injectable partout via @Global)
     LoggerModule,
 
     // Redis utilisé comme storage partagé pour les compteurs de rate limiting

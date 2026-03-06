@@ -156,7 +156,6 @@ export class GlobalExceptionFilter implements ExceptionFilter {
       );
     }
 
-    // Format de réponse standardisé (identique pour toutes les erreurs)
     response.status(status).json({
       statusCode: status,
       error,
